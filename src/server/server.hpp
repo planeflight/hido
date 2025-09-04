@@ -20,6 +20,7 @@ class Server {
     bool check_disconnect(int client, size_t size);
 
     int sock = 0;
+    int epfd = 0;
     std::atomic<bool> running = true;
     std::vector<pollfd> fds;
 };

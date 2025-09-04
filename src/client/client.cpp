@@ -7,22 +7,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <fstream>
-#include <vector>
-
-#include "network.hpp"
-
-std::string load_file(const std::string &file_name) {
-    std::ifstream t(file_name);
-    std::stringstream buffer;
-    buffer << t.rdbuf();
-    std::string source = buffer.str();
-    return source;
-}
+#include <iostream>
+#include <thread>
 
 Client::Client(int port) {
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    sockaddr_in serv_addr{};
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
     inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
@@ -34,65 +23,40 @@ Client::Client(int port) {
     spdlog::info("Successfully established client connection.");
 }
 
+Client::~Client() {
+    close(sock);
+}
+
 void Client::run() {
     spdlog::info("Running client.");
-    pollfd client_poll;
-    client_poll.fd = sock;
-    client_poll.events = POLLIN;
+    std::thread listening{[&]() { listen_thread(); }};
 
-    int size;
-    uint32_t size_read = 0;
-    Message buffer_msg{.bytes = 0};
+    std::string msg;
 
-    enum class State { SIZE, BUFFER } state = State::SIZE;
+    while (running) {
+        std::getline(std::cin, msg);
+        sendto(sock,
+               msg.c_str(),
+               msg.size(),
+               0,
+               (sockaddr *)&serv_addr,
+               sizeof(serv_addr));
+    }
 
-    while (true) {
-        if (poll(&client_poll, 1, 33) < 0) {
-            spdlog::error("Poll error.");
-            continue;
-        }
+    listening.join();
+    spdlog::info("Client shutting down.");
+}
 
-        if (client_poll.revents & POLLIN) {
-            if (state == State::SIZE) {
-                char *offset = ((char *)&size) + size_read;
-                int bytes = recv(sock, offset, sizeof(size) - size_read, 0);
-                if (bytes == 0) {
-                    spdlog::info("Server shut down.");
-                    break;
-                } else if (bytes < 0) {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
-                    spdlog::error("Unexpected error.");
-                    break;
-                }
-                // increment number of bytes read
-                size_read += bytes;
-                // check if we read sizeof(int) = 4 bytes
-                if (size_read == sizeof(size)) {
-                    size = ntohl(size);
-                    state = State::BUFFER;
-                    buffer_msg.buffer.resize(size);
-                    buffer_msg.bytes = 0;
-                }
-            } else {
-                unsigned char *offset =
-                    buffer_msg.buffer.data() + buffer_msg.bytes;
-                int bytes = recv(sock, offset, size - buffer_msg.bytes, 0);
-                if (bytes == 0) {
-                    spdlog::info("Server shut down.");
-                    break;
-                } else if (bytes < 0) {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
-                    spdlog::error("Unexpected error.");
-                    break;
-                }
-                buffer_msg.bytes += bytes;
-                if (buffer_msg.bytes == (size_t)size) {
-                    state = State::SIZE;
-                    size_read = 0;
-                }
-            }
+void Client::listen_thread() {
+    char buffer[1024];
+    while (running) {
+        sockaddr_in from{};
+        socklen_t len = sizeof(from);
+        int n =
+            recvfrom(sock, buffer, sizeof(buffer), 0, (sockaddr *)&from, &len);
+        if (n > 0) {
+            buffer[n] = '\0';
+            fmt::println("Server: {}", buffer);
         }
     }
-    spdlog::info("Client shutting down.");
-    close(sock);
 }

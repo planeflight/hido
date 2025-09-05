@@ -82,7 +82,8 @@ void Server::serve() {
 
     while (running) {
         // wait time of 0 causes return immediately
-        int n_ready = epoll_wait(epfd, events, MAX_EVENTS, 0);
+        // TODO: wait a little to not hog CPU
+        int n_ready = epoll_wait(epfd, events, MAX_EVENTS, 10);
         if (n_ready <= 0) continue;
 
         for (int i = 0; i < n_ready; ++i) {

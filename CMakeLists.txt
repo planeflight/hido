@@ -19,7 +19,11 @@ set(SRC
 )
 
 add_executable(${PROJECT_NAME} ${SRC})
-add_executable(client src/client/client.cpp src/client/main.cpp)
+add_executable(client 
+    src/client/client.cpp
+    src/client/main.cpp
+    src/car.cpp
+)
 
 include_directories(src/)
 
@@ -42,6 +46,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
+add_subdirectory(lib/raylib)
+
 target_link_libraries(${PROJECT_NAME} 
     PRIVATE fmt::fmt
     PRIVATE spdlog::spdlog
@@ -50,4 +56,5 @@ target_link_libraries(${PROJECT_NAME}
 target_link_libraries(client
     PRIVATE fmt::fmt
     PRIVATE spdlog::spdlog
+    PRIVATE raylib
 )

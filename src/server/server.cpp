@@ -72,13 +72,18 @@ void Server::serve() {
         bool operator<(const Client &other) const {
             return memcmp(&addr, &other.addr, sizeof(sockaddr_in)) < 0;
         }
+
+        bool operator==(const Client &other) const {
+            return addr.sin_addr.s_addr == other.addr.sin_addr.s_addr &&
+                   addr.sin_port == other.addr.sin_port;
+        }
     };
 
     const int MAX_EVENTS = 10;
     epoll_event events[MAX_EVENTS];
     // TODO: change to input buffer
-    char buffer[1024];
-    std::set<Client> clients;
+    UpdatePacket packet;
+    std::vector<Client> clients;
 
     while (running) {
         // wait time of 0 causes return immediately
@@ -91,28 +96,38 @@ void Server::serve() {
                 sockaddr_in client_addr{};
                 socklen_t len = sizeof(client_addr);
                 int n = recvfrom(sock,
-                                 buffer,
-                                 sizeof(buffer),
+                                 &packet,
+                                 sizeof(packet),
                                  0,
                                  (sockaddr *)&client_addr,
                                  &len);
                 // TODO: disconnect messages
                 if (n > 0) {
-                    buffer[n] = '\0';
-                    std::string msg(buffer);
                     Client c{client_addr};
-                    clients.insert(c);
-                    fmt::println("Received from client: {}", msg);
-
-                    // broadcast to clients
-                    std::string response = "Echo: " + msg;
+                    auto client_itr =
+                        std::find(clients.begin(), clients.end(), c);
+                    // get id
+                    size_t idx = std::distance(clients.begin(), client_itr);
+                    if (client_itr == clients.end()) {
+                        clients.push_back(c);
+                        idx = clients.size() - 1;
+                    }
+                    packet.idx = idx;
+                    // check if disconnect
+                    if (packet.header.type == PacketType::DISCONNECT) {
+                        clients.erase(clients.begin() + idx);
+                    }
+                    // broadcast message to clients regardless
                     for (auto &cl : clients) {
-                        sendto(sock,
-                               response.c_str(),
-                               response.size(),
-                               0,
-                               (sockaddr *)&cl.addr,
-                               sizeof(cl.addr));
+                        // send to all different clients
+                        if (cl != c) {
+                            sendto(sock,
+                                   &packet,
+                                   sizeof(packet),
+                                   0,
+                                   (sockaddr *)&cl.addr,
+                                   sizeof(cl.addr));
+                        }
                     }
                 }
             }

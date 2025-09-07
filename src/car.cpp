@@ -6,9 +6,7 @@
 
 Car::Car(const Rectangle &rect) : rect(rect) {}
 
-Car::~Car() {
-    UnloadTexture(texture);
-}
+Car::~Car() {}
 
 void Car::input(float dt) {
     const float factor = 180.0f;

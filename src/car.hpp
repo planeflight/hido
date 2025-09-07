@@ -4,7 +4,7 @@
 #include <raylib.h>
 
 struct Car {
-    Car(const Rectangle &rect);
+    explicit Car(const Rectangle &rect);
     ~Car();
 
     void input(float dt);

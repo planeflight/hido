@@ -20,10 +20,18 @@ enum class PacketType : uint8_t {
     DISCONNECT,
 };
 
-struct Packet {
+struct PacketHeader {
     uint32_t timestamp;
     PacketType type;
-    char payload[PACKET_SIZE];
+};
+
+// PROTOCOLS
+// update: position/status update
+// disconnect: client disconnects, server broadcasts message
+struct UpdatePacket {
+    PacketHeader header;
+    int8_t idx = 0;
+    float x, y, direction;
 };
 
 #endif // NETWORK_HPP

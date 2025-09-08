@@ -9,10 +9,11 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <iostream>
 #include <memory>
 #include <thread>
 
+#include "map/map.hpp"
+#include "map/map_renderer.hpp"
 #include "network.hpp"
 
 Client::Client(int port) {
@@ -38,20 +39,21 @@ void Client::run() {
     std::thread listening{[&]() { listen_thread(); }};
 
     SetTargetFPS(60);
-    InitWindow(WIDTH, HEIGHT, "KARTO");
+    InitWindow(WIDTH, HEIGHT, "HIDO");
 
-    player = std::make_unique<Car>(
-        Rectangle{WIDTH / 2 - 28.0f, HEIGHT - 130.0f, 56.0f, 84.0f});
-    Texture player_texture = LoadTexture("./res/car.png");
+    player = std::make_unique<Player>(Rectangle{0.0f, 0.0f, 8.0f, 12.0f});
+    Texture player_texture = LoadTexture("./res/player/idle.png");
     player->texture = player_texture;
-    Texture background_texture = LoadTexture("./res/map.png");
 
     Camera2D camera;
-    camera.zoom = 1.0f;
-    camera.offset = {WIDTH / 2.0f, HEIGHT * 0.75f};
+    camera.zoom = 3.0f;
+    camera.offset = {WIDTH / 2.0f, HEIGHT / 2.0f};
     camera.target = {player->rect.x + player->rect.width / 2.0f,
                      player->rect.y + player->rect.height / 2.0f};
     camera.rotation = 0.0f;
+
+    GameMap map("./res/map/map1.tmx", "./res/map");
+    MapRenderer map_renderer(&map, "./res/map");
 
     float last_t = GetTime();
     while (!WindowShouldClose()) {
@@ -64,37 +66,28 @@ void Client::run() {
         // update
         player->update(dt);
 
-        camera.target.x += (player->rect.x - camera.target.x) * 0.05f;
-        camera.target.y += (player->rect.y - camera.target.y) * 0.05f;
-        camera.rotation += (-player->direction - camera.rotation) * 0.05f;
+        camera.target.x +=
+            (player->rect.x + player->rect.width / 2.0f - camera.target.x) *
+            0.05f;
+        camera.target.y +=
+            (player->rect.y + player->rect.height / 2.0f - camera.target.y) *
+            0.05f;
 
         // network updates
         send_update_packet();
 
         // render
         BeginDrawing();
-        ClearBackground(WHITE);
+        ClearBackground(Color{9, 10, 20, 255});
         BeginMode2D(camera);
 
-        DrawTexturePro(background_texture,
-                       {0.0f,
-                        0.0f,
-                        (float)background_texture.width,
-                        (float)background_texture.height},
-                       {0.0f,
-                        0.0f,
-                        background_texture.width * 2.0f,
-                        background_texture.height * 2.0f},
-                       {0.0f, 0.0f},
-                       0.0f,
-                       WHITE);
+        map_renderer.render();
         player->render();
 
         // draw other clients
         mutex.lock();
         for (const auto &client_packet : clients) {
-            Car c{Rectangle{client_packet.x, client_packet.y, 56.0f, 84.0f}};
-            c.direction = client_packet.direction;
+            Player c{Rectangle{client_packet.x, client_packet.y, 8.0f, 12.0f}};
             c.texture = player_texture;
             c.render();
         }
@@ -106,7 +99,6 @@ void Client::run() {
     // broadcast disconnect
     send_disconnect_packet();
 
-    UnloadTexture(background_texture);
     UnloadTexture(player_texture);
     running = false;
     if (listening.joinable()) listening.join();
@@ -165,8 +157,7 @@ void Client::send_update_packet() {
     UpdatePacket packet{
         .header = {.timestamp = timestamp++, .type = PacketType::UPDATE},
         .x = player->rect.x,
-        .y = player->rect.y,
-        .direction = player->direction};
+        .y = player->rect.y};
     sendto(sock,
            &packet,
            sizeof(packet),

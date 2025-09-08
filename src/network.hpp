@@ -31,7 +31,7 @@ struct PacketHeader {
 struct UpdatePacket {
     PacketHeader header;
     int8_t idx = 0;
-    float x, y, direction;
+    float x, y;
 };
 
 #endif // NETWORK_HPP

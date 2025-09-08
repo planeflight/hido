@@ -8,8 +8,8 @@
 #include <mutex>
 #include <vector>
 
-#include "car.hpp"
 #include "network.hpp"
+#include "player.hpp"
 
 class Client {
   public:
@@ -26,9 +26,9 @@ class Client {
     sockaddr_in serv_addr{};
     std::atomic<bool> running = true;
 
-    std::unique_ptr<Car> player = nullptr;
+    std::unique_ptr<Player> player = nullptr;
 
-    constexpr static int WIDTH = 1280, HEIGHT = 720;
+    constexpr static int WIDTH = 1080, HEIGHT = 1080;
 
     // track others: latest client update packet
     std::vector<UpdatePacket> clients;

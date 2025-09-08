@@ -1,9 +1,9 @@
-# Karting
+# Hido
 
 ## Features
 
 - UDP multiplayer server using epoll
-- 2D Mario-kart power ups and worlds
+- 2D dungeon shooter game
 
 ## Resources
 

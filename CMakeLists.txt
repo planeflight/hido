@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(karting)
+project(hido)
 
 # autocomplete
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -22,10 +22,13 @@ add_executable(${PROJECT_NAME} ${SRC})
 add_executable(client 
     src/client/client.cpp
     src/client/main.cpp
-    src/car.cpp
+    src/map/map.cpp
+    src/map/map_renderer.cpp
+    src/player.cpp
 )
 
 include_directories(src/)
+include_directories(lib/)
 
 
 include(FindPkgConfig)
@@ -47,6 +50,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(spdlog)
 
 add_subdirectory(lib/raylib)
+add_subdirectory(lib/libtmx-parser)
 
 target_link_libraries(${PROJECT_NAME} 
     PRIVATE fmt::fmt
@@ -57,4 +61,5 @@ target_link_libraries(client
     PRIVATE fmt::fmt
     PRIVATE spdlog::spdlog
     PRIVATE raylib
+    PRIVATE libtmx-parser
 )

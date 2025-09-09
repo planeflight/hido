@@ -49,9 +49,8 @@ void GameMap::get_intersect_rects(
 
         for (unsigned int y = bottom; y <= top; y++) {
             for (unsigned int x = left; x <= right; x++) {
-                // need to flip tile_pos
-                unsigned int tile_pos =
-                    ((layer.height - y - 1) * layer.width) + x;
+                // no flip since map orientation is correct in the tmx file
+                unsigned int tile_pos = y * layer.width + x;
                 tmxparser::Tile &tile = layer.tiles[tile_pos];
                 if (tile.gid != 0 && func(&tile, tile_pos)) {
                     collided_tiles.push_back(&tile);
@@ -65,7 +64,7 @@ void GameMap::get_intersect_rects(
 void GameMap::set_tile_rect(Rectangle &rect, unsigned int tile_idx) {
     // convert tile_idx to correct width and height
     unsigned int actual_x = tile_idx % width;
-    unsigned int actual_y = height - (tile_idx / width) - 1;
+    unsigned int actual_y = tile_idx / width;
     // now turn into rect
     rect.x = actual_x * tileWidth;
     rect.y = actual_y * tileHeight;

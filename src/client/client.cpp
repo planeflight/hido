@@ -41,7 +41,7 @@ void Client::run() {
     SetTargetFPS(60);
     InitWindow(WIDTH, HEIGHT, "HIDO");
 
-    player = std::make_unique<Player>(Rectangle{0.0f, 0.0f, 8.0f, 12.0f});
+    player = std::make_unique<Player>(Rectangle{20.0f, 20.0f, 8.0f, 12.0f});
     Texture player_texture = LoadTexture("./res/player/idle.png");
     player->texture = player_texture;
 
@@ -64,7 +64,7 @@ void Client::run() {
         player->input(dt);
 
         // update
-        player->update(dt);
+        player->update(dt, map);
 
         camera.target.x +=
             (player->rect.x + player->rect.width / 2.0f - camera.target.x) *

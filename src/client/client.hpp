@@ -8,6 +8,7 @@
 #include <mutex>
 #include <vector>
 
+#include "bullet.hpp"
 #include "network.hpp"
 #include "player.hpp"
 
@@ -19,6 +20,7 @@ class Client {
 
   private:
     void listen_thread();
+    void send_client_packet(ClientPacket &packet);
     void send_update_packet();
     void send_disconnect_packet();
 
@@ -30,8 +32,10 @@ class Client {
 
     constexpr static int WIDTH = 1080, HEIGHT = 1080;
 
+    std::vector<Bullet> bullets;
+
     // track others: latest client update packet
-    std::vector<UpdatePacket> clients;
+    std::vector<ClientPacket> clients;
     std::mutex mutex;
     uint32_t timestamp = 0;
 };

@@ -1,6 +1,8 @@
 #ifndef NETWORK_HPP
 #define NETWORK_HPP
 
+#include <netinet/in.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -15,7 +17,6 @@ struct Message {
 constexpr size_t PACKET_SIZE = 1024;
 
 enum class PacketType : uint8_t {
-    CONNECT,
     UPDATE,
     DISCONNECT,
 };
@@ -28,10 +29,27 @@ struct PacketHeader {
 // PROTOCOLS
 // update: position/status update
 // disconnect: client disconnects, server broadcasts message
-struct UpdatePacket {
+struct ClientPacket {
     PacketHeader header;
     int8_t idx = 0;
     float x, y;
 };
+
+struct BulletPacket {
+    float x, y;
+};
+// notifies type/size of next packet
+struct SizePacket {
+    size_t size = 0;
+    enum class IncomingType : uint8_t {
+        CLIENT,
+        BULLET,
+    } type;
+};
+
+bool send_packet(int sock,
+                 sockaddr_in &client_addr,
+                 SizePacket &size_packet,
+                 void *packet);
 
 #endif // NETWORK_HPP

@@ -16,6 +16,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(SRC
     src/server/server.cpp
     src/server/main.cpp
+    src/network.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SRC})
@@ -25,6 +26,8 @@ add_executable(client
     src/map/map.cpp
     src/map/map_renderer.cpp
     src/player.cpp
+    src/bullet.cpp
+    src/network.cpp
 )
 
 include_directories(src/)

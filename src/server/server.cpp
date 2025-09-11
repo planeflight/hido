@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "network.hpp"
-#include "spdlog/fmt/bundled/base.h"
 
 Server::Server(uint32_t port) {
     // SOCK_DGRAM: Datagram sockets are for UDP (different order/duplicate msgs)
@@ -67,23 +66,8 @@ Server::~Server() {
 }
 
 void Server::serve() {
-    struct Client {
-        sockaddr_in addr;
-        bool operator<(const Client &other) const {
-            return memcmp(&addr, &other.addr, sizeof(sockaddr_in)) < 0;
-        }
-
-        bool operator==(const Client &other) const {
-            return addr.sin_addr.s_addr == other.addr.sin_addr.s_addr &&
-                   addr.sin_port == other.addr.sin_port;
-        }
-    };
-
     const int MAX_EVENTS = 10;
     epoll_event events[MAX_EVENTS];
-    // TODO: change to input buffer
-    UpdatePacket packet;
-    std::vector<Client> clients;
 
     while (running) {
         // wait time of 0 causes return immediately
@@ -93,43 +77,7 @@ void Server::serve() {
 
         for (int i = 0; i < n_ready; ++i) {
             if (events[i].events & EPOLLIN) {
-                sockaddr_in client_addr{};
-                socklen_t len = sizeof(client_addr);
-                int n = recvfrom(sock,
-                                 &packet,
-                                 sizeof(packet),
-                                 0,
-                                 (sockaddr *)&client_addr,
-                                 &len);
-                // TODO: disconnect messages
-                if (n > 0) {
-                    Client c{client_addr};
-                    auto client_itr =
-                        std::find(clients.begin(), clients.end(), c);
-                    // get id
-                    size_t idx = std::distance(clients.begin(), client_itr);
-                    if (client_itr == clients.end()) {
-                        clients.push_back(c);
-                        idx = clients.size() - 1;
-                    }
-                    packet.idx = idx;
-                    // check if disconnect
-                    if (packet.header.type == PacketType::DISCONNECT) {
-                        clients.erase(clients.begin() + idx);
-                    }
-                    // broadcast message to clients regardless
-                    for (auto &cl : clients) {
-                        // send to all different clients
-                        if (cl != c) {
-                            sendto(sock,
-                                   &packet,
-                                   sizeof(packet),
-                                   0,
-                                   (sockaddr *)&cl.addr,
-                                   sizeof(cl.addr));
-                        }
-                    }
-                }
+                process_events();
             }
         }
     }
@@ -138,4 +86,66 @@ void Server::serve() {
 void Server::shutdown() {
     spdlog::info("Shutting down.");
     running = false;
+}
+
+void Server::process_events() {
+    SizePacket size_packet;
+
+    sockaddr_in client_addr{};
+    socklen_t len = sizeof(client_addr);
+    // get size packet
+    int n = recvfrom(sock,
+                     &size_packet,
+                     sizeof(size_packet),
+                     0,
+                     (sockaddr *)&client_addr,
+                     &len);
+    // WARN: only since UDP sends entire packets, we can assume everything
+    // arrived
+    if (n <= 0) {
+        return;
+    }
+    // check incoming packet type
+    ClientPacket packet;
+    Client c{client_addr};
+    if (size_packet.type == SizePacket::IncomingType::CLIENT) {
+        n = recvfrom(
+            sock, &packet, sizeof(packet), 0, (sockaddr *)&client_addr, &len);
+        if (n <= 0) {
+            return;
+        }
+        c = Client{client_addr};
+        auto client_itr = std::find(clients.begin(), clients.end(), c);
+        // get id
+        size_t idx = std::distance(clients.begin(), client_itr);
+        if (client_itr == clients.end()) {
+            clients.push_back(c);
+            idx = clients.size() - 1;
+            spdlog::info("New client connection {} established.", idx);
+        }
+        packet.idx = idx;
+        // check if disconnect
+        if (packet.header.type == PacketType::DISCONNECT) {
+            spdlog::info("Client {} disconnected.", idx);
+            clients.erase(clients.begin() + idx);
+        }
+    }
+    // broadcast message to clients regardless
+    for (auto &cl : clients) {
+        // send to all different clients
+        if (cl != c) {
+            sendto(sock,
+                   &size_packet,
+                   sizeof(size_packet),
+                   0,
+                   (sockaddr *)&cl.addr,
+                   sizeof(cl.addr));
+            sendto(sock,
+                   &packet,
+                   sizeof(packet),
+                   0,
+                   (sockaddr *)&cl.addr,
+                   sizeof(cl.addr));
+        }
+    }
 }

@@ -105,30 +105,55 @@ void Server::process_events() {
     if (n <= 0) {
         return;
     }
-    // check incoming packet type
+    void *packet_data = nullptr;
+    size_t packet_response_size = size_packet.size;
     ClientPacket packet;
     Client c{client_addr};
+    std::vector<BulletPacket> bullet_packets;
+
+    // set the client/sender id
+    c = Client{client_addr};
+    auto client_itr = std::find(clients.begin(), clients.end(), c);
+    // get id
+    size_t idx = std::distance(clients.begin(), client_itr);
+    if (client_itr == clients.end()) {
+        clients.push_back(c);
+        idx = clients.size() - 1;
+        spdlog::info("New client connection {} established.", idx);
+    }
+    packet.idx = idx;
+    size_packet.sender = idx; // SET CLIENT SENDER ID
+
+    // check incoming packet type
     if (size_packet.type == SizePacket::IncomingType::CLIENT) {
         n = recvfrom(
             sock, &packet, sizeof(packet), 0, (sockaddr *)&client_addr, &len);
         if (n <= 0) {
             return;
         }
-        c = Client{client_addr};
-        auto client_itr = std::find(clients.begin(), clients.end(), c);
-        // get id
-        size_t idx = std::distance(clients.begin(), client_itr);
-        if (client_itr == clients.end()) {
-            clients.push_back(c);
-            idx = clients.size() - 1;
-            spdlog::info("New client connection {} established.", idx);
-        }
-        packet.idx = idx;
+
         // check if disconnect
+        // TODO: this changes index, so make a hashmap of sorts for the clients
+        // and a manager that gives an available index/id
         if (packet.header.type == PacketType::DISCONNECT) {
             spdlog::info("Client {} disconnected.", idx);
             clients.erase(clients.begin() + idx);
         }
+        // set the response data
+        packet_data = &packet;
+    } else if (size_packet.type == SizePacket::IncomingType::BULLET) {
+        // reserve the space
+        bullet_packets.resize(size_packet.size / sizeof(BulletPacket));
+        n = recvfrom(sock,
+                     bullet_packets.data(),
+                     size_packet.size,
+                     0,
+                     (sockaddr *)&client_addr,
+                     &len);
+        spdlog::info("Received bullet data: size {}",
+                     size_packet.size / sizeof(BulletPacket));
+        // set the response data
+        packet_data = bullet_packets.data();
     }
     // broadcast message to clients regardless
     for (auto &cl : clients) {
@@ -141,8 +166,8 @@ void Server::process_events() {
                    (sockaddr *)&cl.addr,
                    sizeof(cl.addr));
             sendto(sock,
-                   &packet,
-                   sizeof(packet),
+                   packet_data,
+                   packet_response_size,
                    0,
                    (sockaddr *)&cl.addr,
                    sizeof(cl.addr));

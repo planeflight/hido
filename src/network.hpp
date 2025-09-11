@@ -40,6 +40,7 @@ struct BulletPacket {
 };
 // notifies type/size of next packet
 struct SizePacket {
+    int8_t sender = -1;
     size_t size = 0;
     enum class IncomingType : uint8_t {
         CLIENT,

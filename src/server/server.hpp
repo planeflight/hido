@@ -9,6 +9,8 @@
 #include <cstring>
 #include <vector>
 
+#include "server/client_manager.hpp"
+
 class Server {
   public:
     Server(uint32_t port);
@@ -26,19 +28,7 @@ class Server {
     std::atomic<bool> running = true;
     std::vector<pollfd> fds;
 
-    struct Client {
-        sockaddr_in addr;
-        bool operator<(const Client &other) const {
-            return memcmp(&addr, &other.addr, sizeof(sockaddr_in)) < 0;
-        }
-
-        bool operator==(const Client &other) const {
-            return addr.sin_addr.s_addr == other.addr.sin_addr.s_addr &&
-                   addr.sin_port == other.addr.sin_port;
-        }
-    };
-
-    std::vector<Client> clients;
+    ClientManager manager;
 };
 
 #endif // SERVER_HPP

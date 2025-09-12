@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "network.hpp"
+#include "server/client_manager.hpp"
 
 Server::Server(uint32_t port) {
     // SOCK_DGRAM: Datagram sockets are for UDP (different order/duplicate msgs)
@@ -108,23 +109,18 @@ void Server::process_events() {
     void *packet_data = nullptr;
     size_t packet_response_size = size_packet.size;
     ClientPacket packet;
-    Client c{client_addr};
     std::vector<BulletPacket> bullet_packets;
 
     // set the client/sender id
-    c = Client{client_addr};
-    auto client_itr = std::find(clients.begin(), clients.end(), c);
+    const ClientAddr &c = manager.add(client_addr);
     // get id
-    size_t idx = std::distance(clients.begin(), client_itr);
-    if (client_itr == clients.end()) {
-        clients.push_back(c);
-        idx = clients.size() - 1;
-        spdlog::info("New client connection {} established.", idx);
-    }
-    packet.idx = idx;
-    size_packet.sender = idx; // SET CLIENT SENDER ID
+    size_t idx = c.id;
 
-    // check incoming packet type
+    // set both packet client sender id's
+    packet.idx = idx;
+    size_packet.sender = idx;
+
+    // A CLIENT UPDATE
     if (size_packet.type == SizePacket::IncomingType::CLIENT) {
         n = recvfrom(
             sock, &packet, sizeof(packet), 0, (sockaddr *)&client_addr, &len);
@@ -137,11 +133,13 @@ void Server::process_events() {
         // and a manager that gives an available index/id
         if (packet.header.type == PacketType::DISCONNECT) {
             spdlog::info("Client {} disconnected.", idx);
-            clients.erase(clients.begin() + idx);
+            manager.remove(c);
         }
         // set the response data
         packet_data = &packet;
-    } else if (size_packet.type == SizePacket::IncomingType::BULLET) {
+    }
+    // A BULLET PACKET
+    else if (size_packet.type == SizePacket::IncomingType::BULLET) {
         // reserve the space
         bullet_packets.resize(size_packet.size / sizeof(BulletPacket));
         n = recvfrom(sock,
@@ -155,9 +153,8 @@ void Server::process_events() {
         // set the response data
         packet_data = bullet_packets.data();
     }
-    // broadcast message to clients regardless
-    for (auto &cl : clients) {
-        // send to all different clients
+    // broadcast message to all other clients
+    for (const auto &cl : manager.get_clients()) {
         if (cl != c) {
             sendto(sock,
                    &size_packet,

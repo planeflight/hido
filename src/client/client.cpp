@@ -90,6 +90,7 @@ void Client::run() {
 
         // network updates
         send_update_packet();
+        // send_bullet_packet();
 
         // render
         BeginDrawing();
@@ -152,43 +153,60 @@ void Client::listen_thread() {
                 spdlog::error("Failed to receive size packet.");
                 continue;
             }
-            n = recvfrom(
-                sock, &packet, sizeof(packet), 0, (sockaddr *)&from, &len);
-            if (n <= 0) {
-                spdlog::error("Failed to receive packet.");
-                continue;
-            }
-            auto client_itr = std::find_if(clients.begin(),
-                                           clients.end(),
-                                           [&packet](const ClientPacket &p) {
-                                               return p.idx == packet.idx;
-                                           });
-            mutex.lock();
-            // update packet if found and timestamp is updated
-            if (client_itr != clients.end()) {
-                if (packet.header.type == PacketType::DISCONNECT) {
-                    spdlog::info("Player disconnected.");
-                    clients.erase(client_itr);
+            if (size_packet.type == SizePacket::IncomingType::CLIENT) {
+                n = recvfrom(
+                    sock, &packet, sizeof(packet), 0, (sockaddr *)&from, &len);
+                if (n <= 0) {
+                    spdlog::error("Failed to receive packet.");
+                    continue;
                 }
-                // otherwise just update the packet
-                else if (packet.header.timestamp >
-                         client_itr->header.timestamp) {
-                    *client_itr = packet;
+                auto client_itr =
+                    std::find_if(clients.begin(),
+                                 clients.end(),
+                                 [&packet](const ClientPacket &p) {
+                                     return p.idx == packet.idx;
+                                 });
+                mutex.lock();
+                // update packet if found and timestamp is updated
+                if (client_itr != clients.end()) {
+                    if (packet.header.type == PacketType::DISCONNECT) {
+                        spdlog::info("Player disconnected.");
+                        clients.erase(client_itr);
+                    }
+                    // otherwise just update the packet
+                    else if (packet.header.timestamp >
+                             client_itr->header.timestamp) {
+                        *client_itr = packet;
+                    }
                 }
+                // otherwise add new packet
+                else {
+                    spdlog::info("New player connected.");
+                    clients.push_back(packet);
+                }
+                mutex.unlock();
             }
-            // otherwise add new packet
-            else {
-                spdlog::info("New player connected.");
-                clients.push_back(packet);
+
+            // bullet packet
+            else if (size_packet.type == SizePacket::IncomingType::BULLET) {
+                fmt::println("received bullet packet.");
+                std::vector<BulletPacket> enemy_bullets;
+                enemy_bullets.resize(size_packet.size / sizeof(BulletPacket));
+                n = recvfrom(sock,
+                             enemy_bullets.data(),
+                             size_packet.size,
+                             0,
+                             (sockaddr *)&from,
+                             &len);
             }
-            mutex.unlock();
         }
     }
 }
 
 void Client::send_client_packet(ClientPacket &packet) {
     // send size packet
-    SizePacket size_packet{.size = sizeof(packet),
+    SizePacket size_packet{.timestamp = ++timestamp,
+                           .size = sizeof(packet),
                            .type = SizePacket::IncomingType::CLIENT};
 
     sendto(sock,
@@ -209,7 +227,7 @@ void Client::send_client_packet(ClientPacket &packet) {
 
 void Client::send_update_packet() {
     ClientPacket packet{
-        .header = {.timestamp = timestamp++, .type = PacketType::UPDATE},
+        .header = {.timestamp = timestamp, .type = PacketType::UPDATE},
         .x = player->rect.x,
         .y = player->rect.y};
     send_client_packet(packet);
@@ -217,8 +235,40 @@ void Client::send_update_packet() {
 
 void Client::send_disconnect_packet() {
     ClientPacket packet{
-        .header = {.timestamp = timestamp++, .type = PacketType::DISCONNECT}
+        .header = {.timestamp = timestamp, .type = PacketType::DISCONNECT}
         // don't bother with the rest
     };
     send_client_packet(packet);
+}
+
+void Client::send_bullet_packet() {
+    // don't send if there are 0 bullets
+    if (bullets.size() == 0) return;
+
+    const size_t n = bullets.size();
+    // send size packet
+    SizePacket size_packet{.timestamp = ++timestamp,
+                           .size = sizeof(BulletPacket) * n,
+                           .type = SizePacket::IncomingType::BULLET};
+    sendto(sock,
+           &size_packet,
+           sizeof(size_packet),
+           0,
+           (sockaddr *)&serv_addr,
+           sizeof(serv_addr));
+
+    // construct actual packet
+    std::vector<BulletPacket> bpackets;
+    bpackets.resize(n);
+    for (size_t i = 0; i < n; ++i) {
+        const Vector2 &pos = bullets[i].get_pos();
+        bpackets[i] = BulletPacket{.x = pos.x, .y = pos.y};
+    }
+    // send actual packet
+    sendto(sock,
+           bpackets.data(),
+           size_packet.size,
+           0,
+           (sockaddr *)&serv_addr,
+           sizeof(serv_addr));
 }

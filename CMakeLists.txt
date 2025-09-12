@@ -15,6 +15,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(SRC
     src/server/server.cpp
+    src/server/client_manager.cpp
     src/server/main.cpp
     src/network.cpp
 )

@@ -23,6 +23,7 @@ class Client {
     void send_client_packet(ClientPacket &packet);
     void send_update_packet();
     void send_disconnect_packet();
+    void send_bullet_packet();
 
     int sock = 0;
     sockaddr_in serv_addr{};
@@ -33,6 +34,7 @@ class Client {
     constexpr static int WIDTH = 1080, HEIGHT = 1080;
 
     std::vector<Bullet> bullets;
+    std::vector<Bullet> enemy_bullets;
 
     // track others: latest client update packet
     std::vector<ClientPacket> clients;

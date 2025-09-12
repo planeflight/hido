@@ -19,8 +19,8 @@ class Bullet {
         return destroy;
     }
 
-    const Vector2 &get_pos() const {
-        return {rect.x, rect.y};
+    Vector2 get_pos() const {
+        return Vector2{rect.x, rect.y};
     }
 
   private:

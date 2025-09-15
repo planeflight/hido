@@ -6,6 +6,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 #include <vector>
 
 #include "bullet.hpp"
@@ -33,12 +34,15 @@ class Client {
 
     constexpr static int WIDTH = 1080, HEIGHT = 1080;
 
+    // this player's bullets
     std::vector<Bullet> bullets;
-    std::vector<Bullet> enemy_bullets;
+    // any other enemy bullets
+    std::unordered_map<int, std::vector<BulletPacket>> latest_enemy_bullet;
+    std::mutex bullets_mutex;
 
     // track others: latest client update packet
     std::vector<ClientPacket> clients;
-    std::mutex mutex;
+    std::mutex clients_mutex;
     uint32_t timestamp = 0;
 };
 

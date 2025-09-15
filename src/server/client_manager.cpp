@@ -1,6 +1,7 @@
 #include "client_manager.hpp"
 
 #include <netinet/in.h>
+#include <spdlog/spdlog.h>
 
 ClientManager::ClientManager() {}
 
@@ -10,8 +11,8 @@ const ClientAddr &ClientManager::add(sockaddr_in client) {
     // add client if not already contained
     if (itr == clients.end()) {
         new_client.id = idx++;
+        spdlog::info("Client {} connected.", new_client.id);
         clients.insert(new_client);
-        active_clients++;
         return *clients.find(new_client);
     }
     return *itr;
@@ -20,7 +21,6 @@ const ClientAddr &ClientManager::add(sockaddr_in client) {
 void ClientManager::remove(const ClientAddr &c) {
     auto itr = clients.find(c);
     if (itr != clients.end()) {
-        active_clients--;
         clients.erase(itr);
     }
 }
@@ -38,5 +38,5 @@ ClientID ClientManager::get(sockaddr_in client) {
 }
 
 size_t ClientManager::count() const {
-    return active_clients;
+    return clients.size();
 }

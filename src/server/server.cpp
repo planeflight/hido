@@ -115,9 +115,7 @@ void Server::process_events() {
     const ClientAddr &c = manager.add(client_addr);
     // get id
     size_t idx = c.id;
-
-    // set both packet client sender id's
-    packet.idx = idx;
+    // set sender id first
     size_packet.sender = idx;
 
     // A CLIENT UPDATE
@@ -129,12 +127,11 @@ void Server::process_events() {
         }
 
         // check if disconnect
-        // TODO: this changes index, so make a hashmap of sorts for the clients
-        // and a manager that gives an available index/id
         if (packet.header.type == PacketType::DISCONNECT) {
             spdlog::info("Client {} disconnected.", idx);
             manager.remove(c);
         }
+        packet.idx = idx;
         // set the response data
         packet_data = &packet;
     }
@@ -148,8 +145,8 @@ void Server::process_events() {
                      0,
                      (sockaddr *)&client_addr,
                      &len);
-        spdlog::info("Received bullet data: size {}",
-                     size_packet.size / sizeof(BulletPacket));
+        // spdlog::info("Received bullet data: size {}",
+        //              size_packet.size / sizeof(BulletPacket));
         // set the response data
         packet_data = bullet_packets.data();
     }

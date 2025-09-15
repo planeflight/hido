@@ -42,7 +42,6 @@ class ClientManager {
 
   private:
     std::set<ClientAddr> clients;
-    size_t active_clients = 0;
     ClientID idx = 0;
 };
 

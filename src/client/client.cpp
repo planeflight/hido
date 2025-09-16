@@ -113,23 +113,26 @@ void Client::run() {
             b.render(bullet_texture);
         }
         // draw other bullets
-        const std::lock_guard<std::mutex> bullet_lock_guard(bullets_mutex);
-        for (const auto &enemy_bullets : latest_enemy_bullet) {
-            for (const BulletPacket &packet : enemy_bullets.second.second) {
-                Bullet b(Rectangle{packet.x, packet.y, 6.0f, 6.0f}, {});
-                b.render(bullet_texture);
+        {
+            const std::lock_guard<std::mutex> bullet_lock_guard(bullets_mutex);
+            for (const auto &enemy_bullets : latest_enemy_bullet) {
+                for (const BulletPacket &packet : enemy_bullets.second.second) {
+                    Bullet b(Rectangle{packet.x, packet.y, 6.0f, 6.0f}, {});
+                    b.render(bullet_texture);
+                }
             }
         }
 
         // draw other clients
-        const std::lock_guard<std::mutex> client_lo_guard(clients_mutex);
-        for (auto &client_packet : clients) {
-            ClientPacket *client = get_client_packet_data(client_packet);
-            Player c{Rectangle{client->x, client->y, 8.0f, 12.0f}};
-            c.texture = player_texture;
-            c.render();
+        {
+            const std::lock_guard<std::mutex> client_lock_guard(clients_mutex);
+            for (auto &client_packet : clients) {
+                ClientPacket *client = get_client_packet_data(client_packet);
+                Player c{Rectangle{client->x, client->y, 8.0f, 12.0f}};
+                c.texture = player_texture;
+                c.render();
+            }
         }
-
         EndMode2D();
         EndDrawing();
     }

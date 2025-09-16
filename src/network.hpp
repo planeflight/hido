@@ -8,53 +8,45 @@
 #include <vector>
 
 constexpr int PORT = 8080;
-
-struct Message {
-    size_t bytes;
-    std::vector<unsigned char> buffer;
-};
-
-constexpr size_t PACKET_SIZE = 1024;
+constexpr size_t ETHERNET_MTU = 1500;
 
 enum class PacketType : uint8_t {
-    UPDATE,
-    DISCONNECT,
+    CLIENT_UPDATE = 0,
+    CLIENT_DISCONNECT,
+    BULLET
 };
 
 struct PacketHeader {
     uint32_t timestamp;
     PacketType type;
+    int8_t sender;
+    uint16_t size;
 };
+
+constexpr size_t MAX_PACKET_SIZE = ETHERNET_MTU - sizeof(PacketHeader);
+
+using Packet = std::array<int8_t, ETHERNET_MTU>;
 
 // PROTOCOLS
 // update: position/status update
 // disconnect: client disconnects, server broadcasts message
 struct ClientPacket {
     PacketHeader header;
-    int8_t idx = 0;
     float x, y;
 };
-
 struct BulletPacket {
     float x, y;
 };
-// notifies type/size of next packet
-struct SizePacket {
-    // header
-    int8_t sender = -1;
-    uint32_t timestamp;
 
-    // data
-    size_t size = 0;
-    enum class IncomingType : uint8_t {
-        CLIENT,
-        BULLET,
-    } type;
-};
+Packet create_client_packet(ClientPacket packet);
 
-bool send_packet(int sock,
-                 sockaddr_in &client_addr,
-                 SizePacket &size_packet,
-                 void *packet);
+PacketHeader *get_header(Packet &packet);
+
+ClientPacket *get_client_packet_data(Packet &packet);
+
+Packet create_bullet_packet(PacketHeader building_header,
+                            const std::vector<BulletPacket> &bullets);
+
+void get_bullet_data(Packet &packet, std::vector<BulletPacket> &bullets);
 
 #endif // NETWORK_HPP

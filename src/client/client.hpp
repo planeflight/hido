@@ -21,7 +21,7 @@ class Client {
 
   private:
     void listen_thread();
-    void send_client_packet(ClientPacket &packet);
+    void send_client_packet(const Packet &packet);
     void send_update_packet();
     void send_disconnect_packet();
     void send_bullet_packet();
@@ -41,7 +41,7 @@ class Client {
     std::mutex bullets_mutex;
 
     // track others: latest client update packet
-    std::vector<ClientPacket> clients;
+    std::vector<Packet> clients;
     std::mutex clients_mutex;
     uint32_t timestamp = 0;
 };

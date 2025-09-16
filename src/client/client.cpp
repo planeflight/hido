@@ -89,8 +89,9 @@ void Client::run() {
             0.05f;
 
         // network updates
+        timestamp++;
         send_update_packet();
-        // send_bullet_packet();
+        send_bullet_packet();
 
         // render
         BeginDrawing();
@@ -115,8 +116,9 @@ void Client::run() {
 
         // draw other clients
         clients_mutex.lock();
-        for (const auto &client_packet : clients) {
-            Player c{Rectangle{client_packet.x, client_packet.y, 8.0f, 12.0f}};
+        for (auto &client_packet : clients) {
+            ClientPacket *client = get_client_packet_data(client_packet);
+            Player c{Rectangle{client->x, client->y, 8.0f, 12.0f}};
             c.texture = player_texture;
             c.render();
         }
@@ -137,8 +139,7 @@ void Client::run() {
 }
 
 void Client::listen_thread() {
-    SizePacket size_packet;
-    ClientPacket packet;
+    Packet packet;
     pollfd fds[1];
     fds[0].fd = sock;
     fds[0].events = POLLIN;
@@ -153,72 +154,54 @@ void Client::listen_thread() {
             while (running) {
                 sockaddr_in from{};
                 socklen_t len = sizeof(from);
-                int n = recvfrom(sock,
-                                 &size_packet,
-                                 sizeof(size_packet),
-                                 MSG_DONTWAIT,
-                                 (sockaddr *)&from,
-                                 &len);
-                if (n <= 0) {
-                    // spdlog::error("Failed to receive size packet.");
+                if (recvfrom(sock,
+                             packet.data(),
+                             packet.size(),
+                             MSG_DONTWAIT,
+                             (sockaddr *)&from,
+                             &len) <= 0) {
                     break;
                 }
-                if (size_packet.type == SizePacket::IncomingType::CLIENT) {
-                    n = recvfrom(sock,
-                                 &packet,
-                                 sizeof(packet),
-                                 MSG_DONTWAIT,
-                                 (sockaddr *)&from,
-                                 &len);
-
-                    if (n <= 0) {
-                        break;
-                    }
-                    auto client_itr =
-                        std::find_if(clients.begin(),
-                                     clients.end(),
-                                     [&packet](const ClientPacket &p) {
-                                         return p.idx == packet.idx;
-                                     });
+                PacketHeader *header = get_header(packet);
+                if (header->type == PacketType::CLIENT_DISCONNECT ||
+                    header->type == PacketType::CLIENT_UPDATE) {
+                    auto client_itr = std::find_if(
+                        clients.begin(), clients.end(), [&header](Packet &p) {
+                            return get_header(p)->sender == header->sender;
+                        });
                     clients_mutex.lock();
                     // update packet if found and timestamp is updated
                     if (client_itr != clients.end()) {
-                        if (packet.header.type == PacketType::DISCONNECT) {
-                            spdlog::info("Player {} disconnected.", packet.idx);
+                        if (header->type == PacketType::CLIENT_DISCONNECT) {
+                            spdlog::info("Player {} disconnected.",
+                                         header->sender);
                             // remove all of this client's bullets as well
-                            latest_enemy_bullet[packet.idx] = {};
+                            latest_enemy_bullet[header->sender] = {};
                             clients.erase(client_itr);
                         }
                         // otherwise just update the packet
-                        else if (packet.header.timestamp >
-                                 client_itr->header.timestamp) {
+                        else if (header->timestamp >
+                                 get_header(*client_itr)->timestamp) {
                             *client_itr = packet;
                         }
                     }
                     // otherwise add new packet
                     else {
                         spdlog::info("New player connected. id: {}",
-                                     packet.idx);
+                                     header->sender);
                         clients.push_back(packet);
                     }
                     clients_mutex.unlock();
                 }
 
                 // bullet packet
-                else if (size_packet.type == SizePacket::IncomingType::BULLET) {
-                    fmt::println("received bullet packet.");
+                else if (header->type == PacketType::BULLET) {
+                    // fmt::println("received bullet packet.");
                     std::vector<BulletPacket> enemy_bullets;
-                    enemy_bullets.resize(size_packet.size /
-                                         sizeof(BulletPacket));
-                    n = recvfrom(sock,
-                                 enemy_bullets.data(),
-                                 size_packet.size,
-                                 0,
-                                 (sockaddr *)&from,
-                                 &len);
+                    get_bullet_data(packet, enemy_bullets);
                     bullets_mutex.lock();
                     // TODO: use timestamps to update
-                    latest_enemy_bullet[size_packet.sender] = enemy_bullets;
+                    latest_enemy_bullet[header->sender] = enemy_bullets;
                     bullets_mutex.unlock();
                 }
             }
@@ -226,59 +209,36 @@ void Client::listen_thread() {
     }
 }
 
-void Client::send_client_packet(ClientPacket &packet) {
-    // send size packet
-    SizePacket size_packet{.timestamp = ++timestamp,
-                           .size = sizeof(packet),
-                           .type = SizePacket::IncomingType::CLIENT};
-
-    sendto(sock,
-           &size_packet,
-           sizeof(size_packet),
-           0,
-           (sockaddr *)&serv_addr,
-           sizeof(serv_addr));
-
+void Client::send_client_packet(const Packet &packet) {
     // send actual packet
     sendto(sock,
-           &packet,
-           sizeof(packet),
+           packet.data(),
+           packet.size(),
            0,
            (sockaddr *)&serv_addr,
            sizeof(serv_addr));
 }
 
 void Client::send_update_packet() {
-    ClientPacket packet{
-        .header = {.timestamp = timestamp, .type = PacketType::UPDATE},
+    ClientPacket p{
+        .header = {.timestamp = timestamp, .type = PacketType::CLIENT_UPDATE},
         .x = player->rect.x,
         .y = player->rect.y};
-    send_client_packet(packet);
+    send_client_packet(create_client_packet(p));
 }
 
 void Client::send_disconnect_packet() {
-    ClientPacket packet{
-        .header = {.timestamp = timestamp, .type = PacketType::DISCONNECT}
-        // don't bother with the rest
-    };
-    send_client_packet(packet);
+    ClientPacket p{.header = {.timestamp = timestamp,
+                              .type = PacketType::CLIENT_DISCONNECT},
+                   .x = 0.0f,
+                   .y = 0.0f};
+    send_client_packet(create_client_packet(p));
 }
 
 void Client::send_bullet_packet() {
-    // don't send if there are 0 bullets
-    if (bullets.size() == 0) return;
-
+    // even send if there are 0 bullets since clients have to know what bullets
+    // are present
     const size_t n = bullets.size();
-    // send size packet
-    SizePacket size_packet{.timestamp = ++timestamp,
-                           .size = sizeof(BulletPacket) * n,
-                           .type = SizePacket::IncomingType::BULLET};
-    sendto(sock,
-           &size_packet,
-           sizeof(size_packet),
-           0,
-           (sockaddr *)&serv_addr,
-           sizeof(serv_addr));
 
     // construct actual packet
     std::vector<BulletPacket> bpackets;
@@ -287,10 +247,15 @@ void Client::send_bullet_packet() {
         const Vector2 &pos = bullets[i].get_pos();
         bpackets[i] = BulletPacket{.x = pos.x, .y = pos.y};
     }
+    PacketHeader header;
+    header.type = PacketType::BULLET;
+    header.timestamp = timestamp; // same frame as the sending of updates
+
+    Packet packet = create_bullet_packet(header, bpackets);
     // send actual packet
     sendto(sock,
-           bpackets.data(),
-           size_packet.size,
+           packet.data(),
+           packet.size(),
            0,
            (sockaddr *)&serv_addr,
            sizeof(serv_addr));

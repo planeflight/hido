@@ -90,78 +90,43 @@ void Server::shutdown() {
 }
 
 void Server::process_events() {
-    SizePacket size_packet;
-
     sockaddr_in client_addr{};
     socklen_t len = sizeof(client_addr);
-    // get size packet
-    int n = recvfrom(sock,
-                     &size_packet,
-                     sizeof(size_packet),
-                     0,
-                     (sockaddr *)&client_addr,
-                     &len);
+
+    Packet packet;
+    // get packet
+    int n = recvfrom(
+        sock, packet.data(), packet.size(), 0, (sockaddr *)&client_addr, &len);
     // WARN: only since UDP sends entire packets, we can assume everything
     // arrived
     if (n <= 0) {
         return;
     }
-    void *packet_data = nullptr;
-    size_t packet_response_size = size_packet.size;
-    ClientPacket packet;
+    // get header
+    PacketHeader *header = get_header(packet);
     std::vector<BulletPacket> bullet_packets;
 
     // set the client/sender id
     const ClientAddr &c = manager.add(client_addr);
-    // get id
-    size_t idx = c.id;
-    // set sender id first
-    size_packet.sender = idx;
+    header->sender = c.id;
 
     // A CLIENT UPDATE
-    if (size_packet.type == SizePacket::IncomingType::CLIENT) {
-        n = recvfrom(
-            sock, &packet, sizeof(packet), 0, (sockaddr *)&client_addr, &len);
-        if (n <= 0) {
-            return;
-        }
-
+    if (header->type == PacketType::CLIENT_UPDATE ||
+        header->type == PacketType::CLIENT_DISCONNECT) {
         // check if disconnect
-        if (packet.header.type == PacketType::DISCONNECT) {
-            spdlog::info("Client {} disconnected.", idx);
+        if (header->type == PacketType::CLIENT_DISCONNECT) {
+            spdlog::info("Client {} disconnected.", c.id);
             manager.remove(c);
         }
-        packet.idx = idx;
-        // set the response data
-        packet_data = &packet;
     }
     // A BULLET PACKET
-    else if (size_packet.type == SizePacket::IncomingType::BULLET) {
-        // reserve the space
-        bullet_packets.resize(size_packet.size / sizeof(BulletPacket));
-        n = recvfrom(sock,
-                     bullet_packets.data(),
-                     size_packet.size,
-                     0,
-                     (sockaddr *)&client_addr,
-                     &len);
-        // spdlog::info("Received bullet data: size {}",
-        //              size_packet.size / sizeof(BulletPacket));
-        // set the response data
-        packet_data = bullet_packets.data();
-    }
+    else if (header->type == PacketType::BULLET) {}
     // broadcast message to all other clients
     for (const auto &cl : manager.get_clients()) {
         if (cl != c) {
             sendto(sock,
-                   &size_packet,
-                   sizeof(size_packet),
-                   0,
-                   (sockaddr *)&cl.addr,
-                   sizeof(cl.addr));
-            sendto(sock,
-                   packet_data,
-                   packet_response_size,
+                   packet.data(),
+                   packet.size(),
                    0,
                    (sockaddr *)&cl.addr,
                    sizeof(cl.addr));

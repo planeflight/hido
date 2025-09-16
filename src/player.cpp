@@ -13,17 +13,17 @@ Player::~Player() {}
 void Player::input(float dt) {
     vel.x = 0.0f;
     vel.y = 0.0f;
-    if (IsKeyDown(KEY_LEFT)) {
+    if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
         vel.x = -SPEED;
     }
-    if (IsKeyDown(KEY_RIGHT)) {
+    if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
         vel.x = SPEED;
     }
 
-    if (IsKeyDown(KEY_DOWN)) {
+    if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
         vel.y = SPEED;
     }
-    if (IsKeyDown(KEY_UP)) {
+    if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
         vel.y = -SPEED;
     }
 }

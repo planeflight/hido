@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <raylib.h>
+#include <raymath.h>
 #include <spdlog/spdlog.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
@@ -10,6 +11,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 #include "bullet.hpp"
@@ -66,10 +68,16 @@ void Client::run() {
         // input
         player->input(dt);
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            Vector2 direction,
+                mouse_pos = GetMousePosition(),
+                world_pos = GetScreenToWorld2D(mouse_pos, camera);
+            direction.x = world_pos.x - player->rect.x;
+            direction.y = world_pos.y - player->rect.y;
+            direction = Vector2Normalize(direction);
+
             bullets.push_back(
                 Bullet(Rectangle{player->rect.x, player->rect.y, 6.0f, 6.0f},
-                       Vector2{(float)sign(player->vel.x),
-                               (float)sign(player->vel.y)}));
+                       direction));
         }
 
         // update
@@ -105,24 +113,22 @@ void Client::run() {
             b.render(bullet_texture);
         }
         // draw other bullets
-        bullets_mutex.lock();
+        const std::lock_guard<std::mutex> bullet_lock_guard(bullets_mutex);
         for (const auto &enemy_bullets : latest_enemy_bullet) {
-            for (const BulletPacket &packet : enemy_bullets.second) {
+            for (const BulletPacket &packet : enemy_bullets.second.second) {
                 Bullet b(Rectangle{packet.x, packet.y, 6.0f, 6.0f}, {});
                 b.render(bullet_texture);
             }
         }
-        bullets_mutex.unlock();
 
         // draw other clients
-        clients_mutex.lock();
+        const std::lock_guard<std::mutex> client_lo_guard(clients_mutex);
         for (auto &client_packet : clients) {
             ClientPacket *client = get_client_packet_data(client_packet);
             Player c{Rectangle{client->x, client->y, 8.0f, 12.0f}};
             c.texture = player_texture;
             c.render();
         }
-        clients_mutex.unlock();
 
         EndMode2D();
         EndDrawing();
@@ -169,8 +175,9 @@ void Client::listen_thread() {
                         clients.begin(), clients.end(), [&header](Packet &p) {
                             return get_header(p)->sender == header->sender;
                         });
-                    clients_mutex.lock();
-                    // update packet if found and timestamp is updated
+                    const std::lock_guard<std::mutex> client_lo_guard(
+                        clients_mutex);
+                    // update packet if found
                     if (client_itr != clients.end()) {
                         if (header->type == PacketType::CLIENT_DISCONNECT) {
                             spdlog::info("Player {} disconnected.",
@@ -191,7 +198,6 @@ void Client::listen_thread() {
                                      header->sender);
                         clients.push_back(packet);
                     }
-                    clients_mutex.unlock();
                 }
 
                 // bullet packet
@@ -199,10 +205,16 @@ void Client::listen_thread() {
                     // fmt::println("received bullet packet.");
                     std::vector<BulletPacket> enemy_bullets;
                     get_bullet_data(packet, enemy_bullets);
-                    bullets_mutex.lock();
-                    // TODO: use timestamps to update
-                    latest_enemy_bullet[header->sender] = enemy_bullets;
-                    bullets_mutex.unlock();
+                    const std::lock_guard<std::mutex> bullet_lock(
+                        bullets_mutex);
+
+                    auto &last_enemy_bullet =
+                        latest_enemy_bullet[header->sender];
+                    // update if timestamp is more recent
+                    if (header->timestamp > last_enemy_bullet.first) {
+                        last_enemy_bullet.first = header->timestamp;
+                        last_enemy_bullet.second = enemy_bullets;
+                    }
                 }
             }
         }

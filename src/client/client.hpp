@@ -32,12 +32,13 @@ class Client {
 
     std::unique_ptr<Player> player = nullptr;
 
-    constexpr static int WIDTH = 1080, HEIGHT = 1080;
+    constexpr static int WIDTH = 720, HEIGHT = 720;
 
     // this player's bullets
     std::vector<Bullet> bullets;
-    // any other enemy bullets
-    std::unordered_map<int, std::vector<BulletPacket>> latest_enemy_bullet;
+    // any other enemy bullets <id, <timestamp, bullet_list>>
+    std::unordered_map<int, std::pair<uint32_t, std::vector<BulletPacket>>>
+        latest_enemy_bullet;
     std::mutex bullets_mutex;
 
     // track others: latest client update packet

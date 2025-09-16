@@ -5,19 +5,8 @@
 
 #include <cstring>
 
-Packet create_client_packet(ClientPacket packet) {
-    Packet p;
-    auto dest = p.data();
-    memcpy(dest, &packet, sizeof(packet));
-    return p;
-}
-
 PacketHeader *get_header(Packet &packet) {
     return (PacketHeader *)packet.data();
-}
-
-ClientPacket *get_client_packet_data(Packet &packet) {
-    return (ClientPacket *)&packet;
 }
 
 Packet create_bullet_packet(PacketHeader building_header,

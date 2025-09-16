@@ -48,7 +48,9 @@ void Client::run() {
     player = std::make_unique<Player>(Rectangle{20.0f, 20.0f, 8.0f, 12.0f});
     Texture player_texture = LoadTexture("./res/player/idle.png");
     Texture bullet_texture = LoadTexture("./res/bullet.png");
+    Texture health_bar_texture = LoadTexture("./res/health_bar.png");
     player->texture = player_texture;
+    player->health_bar_texture = health_bar_texture;
 
     Camera2D camera;
     camera.zoom = 3.0f;
@@ -96,6 +98,27 @@ void Client::run() {
             (player->rect.y + player->rect.height / 2.0f - camera.target.y) *
             0.05f;
 
+        // check if this client's bullets hit any clients
+        for (auto itr = bullets.begin(); itr != bullets.end(); itr++) {
+            Bullet &bullet = *itr;
+            Rectangle bullet_rect{
+                bullet.get_pos().x, bullet.get_pos().y, 6.0f, 6.0f};
+            std::lock_guard<std::mutex> client_lock_guard(clients_mutex);
+
+            for (Packet &packet : clients) {
+                ClientPacket *c = get_packet_data<ClientPacket>(packet);
+                Rectangle client_rect{c->x, c->y, 8.0f, 12.0f};
+                // if collision, send collided message
+                if (CheckCollisionRecs(client_rect, bullet_rect)) {
+                    send_bullet_collision_packet(c->header.sender);
+                    bullets.erase(itr);
+                    itr--;
+                    // no need to check the other clients
+                    break;
+                }
+            }
+        }
+
         // network updates
         timestamp++;
         send_update_packet();
@@ -127,9 +150,12 @@ void Client::run() {
         {
             const std::lock_guard<std::mutex> client_lock_guard(clients_mutex);
             for (auto &client_packet : clients) {
-                ClientPacket *client = get_client_packet_data(client_packet);
+                ClientPacket *client =
+                    get_packet_data<ClientPacket>(client_packet);
                 Player c{Rectangle{client->x, client->y, 8.0f, 12.0f}};
                 c.texture = player_texture;
+                c.health_bar_texture = health_bar_texture;
+                c.health = client->health;
                 c.render();
             }
         }
@@ -141,6 +167,7 @@ void Client::run() {
 
     UnloadTexture(player_texture);
     UnloadTexture(bullet_texture);
+    UnloadTexture(health_bar_texture);
     running = false;
     if (listening.joinable()) listening.join();
 
@@ -205,7 +232,6 @@ void Client::listen_thread() {
 
                 // bullet packet
                 else if (header->type == PacketType::BULLET) {
-                    // fmt::println("received bullet packet.");
                     std::vector<BulletPacket> enemy_bullets;
                     get_bullet_data(packet, enemy_bullets);
                     const std::lock_guard<std::mutex> bullet_lock(
@@ -218,6 +244,12 @@ void Client::listen_thread() {
                         last_enemy_bullet.first = header->timestamp;
                         last_enemy_bullet.second = enemy_bullets;
                     }
+                }
+
+                // bullet collision packet
+                else if (header->type == PacketType::BULLET_COLLISION) {
+                    // WARN: we lose a UDP packet, player doesn't lose as much
+                    player->health -= 0.2f;
                 }
             }
         }
@@ -238,8 +270,9 @@ void Client::send_update_packet() {
     ClientPacket p{
         .header = {.timestamp = timestamp, .type = PacketType::CLIENT_UPDATE},
         .x = player->rect.x,
-        .y = player->rect.y};
-    send_client_packet(create_client_packet(p));
+        .y = player->rect.y,
+        .health = player->health};
+    send_client_packet(create_packet_from<ClientPacket>(p));
 }
 
 void Client::send_disconnect_packet() {
@@ -247,7 +280,7 @@ void Client::send_disconnect_packet() {
                               .type = PacketType::CLIENT_DISCONNECT},
                    .x = 0.0f,
                    .y = 0.0f};
-    send_client_packet(create_client_packet(p));
+    send_client_packet(create_packet_from<ClientPacket>(p));
 }
 
 void Client::send_bullet_packet() {
@@ -267,6 +300,23 @@ void Client::send_bullet_packet() {
     header.timestamp = timestamp; // same frame as the sending of updates
 
     Packet packet = create_bullet_packet(header, bpackets);
+    // send actual packet
+    sendto(sock,
+           packet.data(),
+           packet.size(),
+           0,
+           (sockaddr *)&serv_addr,
+           sizeof(serv_addr));
+}
+
+void Client::send_bullet_collision_packet(int client_id) {
+    Packet packet;
+    BulletCollisionPacket bcp;
+    bcp.header = {.timestamp = timestamp, .type = PacketType::BULLET_COLLISION};
+    bcp.to = client_id;
+
+    packet = create_packet_from<BulletCollisionPacket>(bcp);
+
     // send actual packet
     sendto(sock,
            packet.data(),

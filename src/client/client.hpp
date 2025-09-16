@@ -25,6 +25,7 @@ class Client {
     void send_update_packet();
     void send_disconnect_packet();
     void send_bullet_packet();
+    void send_bullet_collision_packet(int client_id);
 
     int sock = 0;
     sockaddr_in serv_addr{};

@@ -14,11 +14,13 @@ struct Player {
     void update(float dt, GameMap &map);
 
     Rectangle rect;
-    Texture texture;
+    Texture texture, health_bar_texture;
 
     Vector2 vel;
     constexpr static float SPEED = 80.0f;
     constexpr static float ACCELERATION = 900.0f;
+
+    float health = 1.0f;
 };
 
 #endif // PLAYER_HPP

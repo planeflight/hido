@@ -30,6 +30,28 @@ void Player::input(float dt) {
 
 void Player::render() {
     DrawTexture(texture, rect.x, rect.y, WHITE);
+    // draw health bar
+    const float max_width = 14.0f, max_height = 5.0f;
+    const float bar_width = health * (max_width - 2.0f);
+
+    Rectangle health_rect;
+    health_rect.x = rect.x + rect.width / 2.0f - max_width / 2.0f;
+    health_rect.y = rect.y - max_height - 2.0f;
+    health_rect.width = max_width;
+    health_rect.height = max_height;
+
+    DrawRectangle(health_rect.x + 1.0f,
+                  health_rect.y + 1.0f,
+                  health_rect.width - 2.0f,
+                  health_rect.height - 2.0f,
+                  Color{185, 89, 61, 255});
+    DrawRectangle(health_rect.x + 1.0f,
+                  health_rect.y + 1.0f,
+                  bar_width,
+                  health_rect.height - 2.0f,
+                  Color{150, 80, 250, 255});
+    // finally draw the texture
+    DrawTexture(health_bar_texture, health_rect.x, health_rect.y, WHITE);
 }
 
 void Player::update(float dt, GameMap &map) {

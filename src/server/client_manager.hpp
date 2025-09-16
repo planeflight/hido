@@ -40,6 +40,8 @@ class ClientManager {
         return clients;
     }
 
+    const ClientAddr &find_by_id(ClientID id);
+
   private:
     std::set<ClientAddr> clients;
     ClientID idx = 0;

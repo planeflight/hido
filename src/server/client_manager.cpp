@@ -3,6 +3,8 @@
 #include <netinet/in.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+
 ClientManager::ClientManager() {}
 
 const ClientAddr &ClientManager::add(sockaddr_in client) {
@@ -39,4 +41,15 @@ ClientID ClientManager::get(sockaddr_in client) {
 
 size_t ClientManager::count() const {
     return clients.size();
+}
+
+const ClientAddr &ClientManager::find_by_id(ClientID id) {
+    auto itr = std::find_if(
+        clients.begin(), clients.end(), [&id](const ClientAddr &addr) -> bool {
+            return id == addr.id;
+        });
+    if (itr == clients.end()) {
+        spdlog::error("Failed to find client {}", id);
+    }
+    return *itr;
 }

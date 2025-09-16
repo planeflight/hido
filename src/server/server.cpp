@@ -119,8 +119,23 @@ void Server::process_events() {
             manager.remove(c);
         }
     }
-    // A BULLET PACKET
-    else if (header->type == PacketType::BULLET) {}
+    // A BULLET COLLISION PACKET
+    else if (header->type == PacketType::BULLET_COLLISION) {
+        BulletCollisionPacket *bcp =
+            get_packet_data<BulletCollisionPacket>(packet);
+
+        // find receiver of the bullet collision's address
+        ClientAddr receiver_addr = manager.find_by_id(bcp->to);
+
+        // send message to the client in particular
+        sendto(sock,
+               packet.data(),
+               packet.size(),
+               0,
+               (sockaddr *)&receiver_addr.addr,
+               sizeof(receiver_addr.addr));
+        return;
+    }
     // broadcast message to all other clients
     for (const auto &cl : manager.get_clients()) {
         if (cl != c) {

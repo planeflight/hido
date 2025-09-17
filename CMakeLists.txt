@@ -17,7 +17,10 @@ set(SRC
     src/server/server.cpp
     src/server/client_manager.cpp
     src/server/main.cpp
+    src/map/map.cpp
+    src/state/player.cpp
     src/network.cpp
+    src/util.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SRC})
@@ -26,9 +29,10 @@ add_executable(client
     src/client/main.cpp
     src/map/map.cpp
     src/map/map_renderer.cpp
-    src/player.cpp
+    src/state/player.cpp
     src/bullet.cpp
     src/network.cpp
+    src/util.cpp
 )
 
 include_directories(src/)
@@ -59,6 +63,8 @@ add_subdirectory(lib/libtmx-parser)
 target_link_libraries(${PROJECT_NAME} 
     PRIVATE fmt::fmt
     PRIVATE spdlog::spdlog
+    PRIVATE raylib
+    PRIVATE libtmx-parser
 )
 
 target_link_libraries(client

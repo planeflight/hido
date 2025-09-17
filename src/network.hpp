@@ -8,18 +8,25 @@
 #include <cstdint>
 #include <vector>
 
+#include "state/player.hpp"
+
 constexpr int PORT = 8080;
 constexpr size_t ETHERNET_MTU = 1500;
+constexpr size_t MAX_PLAYERS = 5;
+// since packets take time to arrive
+constexpr uint64_t INTERPOLATION_DELAY = 100;
 
 enum class PacketType : uint8_t {
     CLIENT_UPDATE = 0,
     CLIENT_DISCONNECT,
     BULLET,
-    BULLET_COLLISION
+    BULLET_COLLISION,
+    INPUT,
+    GAME_STATE,
 };
 
 struct PacketHeader {
-    uint32_t timestamp;
+    uint64_t timestamp = 0; // millis
     PacketType type;
     int8_t sender = -1;
     uint16_t size; // optional if not a dynamic buffer
@@ -43,6 +50,18 @@ struct BulletPacket {
 struct BulletCollisionPacket {
     PacketHeader header;
     int8_t to;
+};
+
+struct InputPacket {
+    PacketHeader header;
+    bool left, right, up, down, mouse;
+};
+
+struct GameStatePacket {
+    PacketHeader header;
+    int8_t num_players = 0;
+    int client_id = 0; // tells clients what their id is
+    std::array<PlayerState, MAX_PLAYERS> players;
 };
 
 /**

@@ -5,15 +5,18 @@
 
 #include <cstring>
 #include <set>
+#include <unordered_map>
+
+#include "network.hpp"
+#include "state/player.hpp"
 
 using ClientID = int;
 struct ClientAddr {
-    sockaddr_in addr;
-    // optional, just used for storing id's by server
-    ClientID id;
+    explicit ClientAddr(sockaddr_in addr);
+    ClientAddr() = default;
 
     bool operator<(const ClientAddr &other) const {
-        return memcmp(&addr, &other.addr, sizeof(sockaddr_in)) < 0;
+        return id < other.id;
     }
 
     bool operator==(const ClientAddr &other) const {
@@ -25,25 +28,28 @@ struct ClientAddr {
         return client.sin_addr.s_addr == addr.sin_addr.s_addr &&
                client.sin_port == addr.sin_port;
     }
+    sockaddr_in addr;
+    PlayerState player;
+    InputPacket last_input;
+    // optional, just used for storing id's by server
+    ClientID id;
 };
 
 class ClientManager {
   public:
     ClientManager();
-    const ClientAddr &add(sockaddr_in client);
+    ClientAddr &add(sockaddr_in client);
     void remove(const ClientAddr &c);
-    ClientID get(const ClientAddr &c);
-    ClientID get(sockaddr_in client);
     size_t count() const;
 
-    const std::set<ClientAddr> &get_clients() const {
+    std::unordered_map<ClientID, ClientAddr> &get_clients() {
         return clients;
     }
 
-    const ClientAddr &find_by_id(ClientID id);
+    ClientAddr &find_by_id(ClientID id);
 
   private:
-    std::set<ClientAddr> clients;
+    std::unordered_map<ClientID, ClientAddr> clients;
     ClientID idx = 0;
 };
 

@@ -18,6 +18,7 @@
 #include "map/map.hpp"
 #include "map/map_renderer.hpp"
 #include "network.hpp"
+#include "state/player.hpp"
 #include "util.hpp"
 
 Client::Client(int port) {
@@ -34,6 +35,10 @@ Client::Client(int port) {
 }
 
 Client::~Client() {
+    UnloadTexture(player_texture);
+    UnloadTexture(bullet_texture);
+    UnloadTexture(health_bar_texture);
+
     CloseWindow();
     close(sock);
 }
@@ -45,133 +50,162 @@ void Client::run() {
     SetTargetFPS(60);
     InitWindow(WIDTH, HEIGHT, "HIDO");
 
-    player = std::make_unique<Player>(Rectangle{20.0f, 20.0f, 8.0f, 12.0f});
-    Texture player_texture = LoadTexture("./res/player/idle.png");
-    Texture bullet_texture = LoadTexture("./res/bullet.png");
-    Texture health_bar_texture = LoadTexture("./res/health_bar.png");
-    player->texture = player_texture;
-    player->health_bar_texture = health_bar_texture;
+    player_texture = LoadTexture("./res/player/idle.png");
+    bullet_texture = LoadTexture("./res/bullet.png");
+    health_bar_texture = LoadTexture("./res/health_bar.png");
 
     Camera2D camera;
     camera.zoom = 3.0f;
     camera.offset = {WIDTH / 2.0f, HEIGHT / 2.0f};
-    camera.target = {player->rect.x + player->rect.width / 2.0f,
-                     player->rect.y + player->rect.height / 2.0f};
     camera.rotation = 0.0f;
+    camera.target = {0.0f, 0.0f};
 
     GameMap map("./res/map/map1.tmx", "./res/map");
     MapRenderer map_renderer(&map, "./res/map");
-
-    float last_t = GetTime();
     while (!WindowShouldClose()) {
-        float dt = (GetTime() - last_t);
-        last_t = GetTime();
-
-        // input
-        player->input(dt);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            Vector2 direction,
-                mouse_pos = GetMousePosition(),
-                world_pos = GetScreenToWorld2D(mouse_pos, camera);
-            direction.x = world_pos.x - player->rect.x;
-            direction.y = world_pos.y - player->rect.y;
-            direction = Vector2Normalize(direction);
-
-            bullets.push_back(
-                Bullet(Rectangle{player->rect.x, player->rect.y, 6.0f, 6.0f},
-                       direction));
-        }
+        // get input and send packet
+        send_input_packet();
 
         // update
-        player->update(dt, map);
-        for (int i = bullets.size() - 1; i >= 0; --i) {
-            bullets[i].update(dt, map, {});
-            if (bullets[i].get_destroy()) {
-                bullets.erase(bullets.begin() + i);
-            }
-        }
+        // for (int i = bullets.size() - 1; i >= 0; --i) {
+        //     bullets[i].update(dt, map, {});
+        //     if (bullets[i].get_destroy()) {
+        //         bullets.erase(bullets.begin() + i);
+        //     }
+        // }
 
-        camera.target.x +=
-            (player->rect.x + player->rect.width / 2.0f - camera.target.x) *
-            0.05f;
-        camera.target.y +=
-            (player->rect.y + player->rect.height / 2.0f - camera.target.y) *
-            0.05f;
+        // camera.target.x +=
+        //     (player->rect.x + player->rect.width / 2.0f - camera.target.x) *
+        //     0.05f;
+        // camera.target.y +=
+        //     (player->rect.y + player->rect.height / 2.0f - camera.target.y) *
+        //     0.05f;
 
         // check if this client's bullets hit any clients
-        for (auto itr = bullets.begin(); itr != bullets.end(); itr++) {
-            Bullet &bullet = *itr;
-            Rectangle bullet_rect{
-                bullet.get_pos().x, bullet.get_pos().y, 6.0f, 6.0f};
-            std::lock_guard<std::mutex> client_lock_guard(clients_mutex);
-
-            for (Packet &packet : clients) {
-                ClientPacket *c = get_packet_data<ClientPacket>(packet);
-                Rectangle client_rect{c->x, c->y, 8.0f, 12.0f};
-                // if collision, send collided message
-                if (CheckCollisionRecs(client_rect, bullet_rect)) {
-                    send_bullet_collision_packet(c->header.sender);
-                    bullets.erase(itr);
-                    itr--;
-                    // no need to check the other clients
-                    break;
-                }
-            }
-        }
+        // for (auto itr = bullets.begin(); itr != bullets.end(); itr++) {
+        //     Bullet &bullet = *itr;
+        //     Rectangle bullet_rect{
+        //         bullet.get_pos().x, bullet.get_pos().y, 6.0f, 6.0f};
+        //     std::lock_guard<std::mutex> client_lock_guard(clients_mutex);
+        //
+        //     for (Packet &packet : clients) {
+        //         ClientPacket *c = get_packet_data<ClientPacket>(packet);
+        //         Rectangle client_rect{c->x, c->y, 8.0f, 12.0f};
+        //         // if collision, send collided message
+        //         if (CheckCollisionRecs(client_rect, bullet_rect)) {
+        //             // send_bullet_collision_packet(c->header.sender);
+        //             bullets.erase(itr);
+        //             itr--;
+        //             // no need to check the other clients
+        //             break;
+        //         }
+        //     }
+        // }
 
         // network updates
         timestamp++;
-        send_update_packet();
-        send_bullet_packet();
+        // send_update_packet();
+        // send_bullet_packet();
 
         // render
         BeginDrawing();
         ClearBackground(Color{9, 10, 20, 255});
         BeginMode2D(camera);
-
         map_renderer.render();
-        player->render();
 
-        for (Bullet &b : bullets) {
-            b.render(bullet_texture);
-        }
-        // draw other bullets
-        {
-            const std::lock_guard<std::mutex> bullet_lock_guard(bullets_mutex);
-            for (const auto &enemy_bullets : latest_enemy_bullet) {
-                for (const BulletPacket &packet : enemy_bullets.second.second) {
-                    Bullet b(Rectangle{packet.x, packet.y, 6.0f, 6.0f}, {});
-                    b.render(bullet_texture);
-                }
-            }
-        }
+        if (state_buffer.size() >= 2) {
+            // get render time
+            uint64_t now =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch())
+                    .count();
+            uint64_t render_time = now - INTERPOLATION_DELAY;
 
-        // draw other clients
-        {
-            const std::lock_guard<std::mutex> client_lock_guard(clients_mutex);
-            for (auto &client_packet : clients) {
-                ClientPacket *client =
-                    get_packet_data<ClientPacket>(client_packet);
-                Player c{Rectangle{client->x, client->y, 8.0f, 12.0f}};
-                c.texture = player_texture;
-                c.health_bar_texture = health_bar_texture;
-                c.health = client->health;
-                c.render();
-            }
+            render_state(render_time);
         }
+        // for (Bullet &b : bullets) {
+        //     b.render(bullet_texture);
+        // }
+        // // draw other bullets
+        // {
+        //     const std::lock_guard<std::mutex>
+        //     bullet_lock_guard(bullets_mutex); for (const auto &enemy_bullets
+        //     : latest_enemy_bullet) {
+        //         for (const BulletPacket &packet :
+        //         enemy_bullets.second.second) {
+        //             Bullet b(Rectangle{packet.x, packet.y, 6.0f, 6.0f}, {});
+        //             b.render(bullet_texture);
+        //         }
+        //     }
+        // }
+        //
+        // // draw other clients
+        // {
+        //     const std::lock_guard<std::mutex>
+        //     client_lock_guard(clients_mutex); for (auto &client_packet :
+        //     clients) {
+        //         ClientPacket *client =
+        //             get_packet_data<ClientPacket>(client_packet);
+        //         Player c{Rectangle{client->x, client->y, 8.0f, 12.0f}};
+        //         c.texture = player_texture;
+        //         c.health_bar_texture = health_bar_texture;
+        //         c.health = client->health;
+        //         c.render();
+        //     }
+        // }
         EndMode2D();
         EndDrawing();
     }
     // broadcast disconnect
     send_disconnect_packet();
 
-    UnloadTexture(player_texture);
-    UnloadTexture(bullet_texture);
-    UnloadTexture(health_bar_texture);
     running = false;
     if (listening.joinable()) listening.join();
 
     spdlog::info("Client shutting down.");
+}
+
+void Client::render_state(uint64_t render_time) {
+    // trim state buffer
+    std::lock_guard<std::mutex> state_lock_guard(state_mutex);
+    // force second element to be after render_time and
+    while (state_buffer.size() >= 2 &&
+           state_buffer[1].header.timestamp <= render_time) {
+        state_buffer.pop_front();
+    }
+
+    // draw the lerped states
+    auto &a = state_buffer[0];
+    auto &b = state_buffer[1];
+    float t = (render_time - a.header.timestamp) /
+              float(b.header.timestamp - a.header.timestamp);
+
+    // draw other players in different color
+    for (size_t i = 0; i < b.num_players; ++i) {
+        auto &player_b = b.players[i];
+        // draw others in red
+        Color color = {207, 87, 80, 255};
+        if (player_b.id == b.client_id) {
+            color = WHITE;
+        }
+        // try find this player in previous frame (A)
+        auto itr = std::find_if(a.players.begin(),
+                                a.players.end(),
+                                [&player_b](const PlayerState &state) {
+                                    return state.id == player_b.id;
+                                });
+        // if existed on last frame, lerp
+        if (itr != a.players.end()) {
+            player_render(player_lerp(*itr, player_b, t),
+                          player_texture,
+                          health_bar_texture,
+                          color);
+        }
+        // otherwise just render latest frame (B)
+        else {
+            player_render(player_b, player_texture, health_bar_texture, color);
+        }
+    }
 }
 
 void Client::listen_thread() {
@@ -199,58 +233,34 @@ void Client::listen_thread() {
                     break;
                 }
                 PacketHeader *header = get_header(packet);
-                if (header->type == PacketType::CLIENT_DISCONNECT ||
-                    header->type == PacketType::CLIENT_UPDATE) {
-                    auto client_itr = std::find_if(
-                        clients.begin(), clients.end(), [&header](Packet &p) {
-                            return get_header(p)->sender == header->sender;
-                        });
-                    const std::lock_guard<std::mutex> client_lo_guard(
-                        clients_mutex);
-                    // update packet if found
-                    if (client_itr != clients.end()) {
-                        if (header->type == PacketType::CLIENT_DISCONNECT) {
-                            spdlog::info("Player {} disconnected.",
-                                         header->sender);
-                            // remove all of this client's bullets as well
-                            latest_enemy_bullet[header->sender] = {};
-                            clients.erase(client_itr);
-                        }
-                        // otherwise just update the packet
-                        else if (header->timestamp >
-                                 get_header(*client_itr)->timestamp) {
-                            *client_itr = packet;
-                        }
-                    }
-                    // otherwise add new packet
-                    else {
-                        spdlog::info("New player connected. id: {}",
-                                     header->sender);
-                        clients.push_back(packet);
-                    }
+                if (header->type == PacketType::GAME_STATE) {
+                    GameStatePacket *gsp =
+                        get_packet_data<GameStatePacket>(packet);
+                    std::lock_guard<std::mutex> lock_guard(state_mutex);
+                    state_buffer.push_back(*gsp);
                 }
 
-                // bullet packet
-                else if (header->type == PacketType::BULLET) {
-                    std::vector<BulletPacket> enemy_bullets;
-                    get_bullet_data(packet, enemy_bullets);
-                    const std::lock_guard<std::mutex> bullet_lock(
-                        bullets_mutex);
-
-                    auto &last_enemy_bullet =
-                        latest_enemy_bullet[header->sender];
-                    // update if timestamp is more recent
-                    if (header->timestamp > last_enemy_bullet.first) {
-                        last_enemy_bullet.first = header->timestamp;
-                        last_enemy_bullet.second = enemy_bullets;
-                    }
-                }
-
-                // bullet collision packet
-                else if (header->type == PacketType::BULLET_COLLISION) {
-                    // WARN: we lose a UDP packet, player doesn't lose as much
-                    player->health -= 0.2f;
-                }
+                // // bullet packet
+                // else if (header->type == PacketType::BULLET) {
+                //     std::vector<BulletPacket> enemy_bullets;
+                //     get_bullet_data(packet, enemy_bullets);
+                //     const std::lock_guard<std::mutex> bullet_lock(
+                //         bullets_mutex);
+                //
+                //     auto &last_enemy_bullet =
+                //         latest_enemy_bullet[header->sender];
+                //     // update if timestamp is more recent
+                //     if (header->timestamp > last_enemy_bullet.first) {
+                //         last_enemy_bullet.first = header->timestamp;
+                //         last_enemy_bullet.second = enemy_bullets;
+                //     }
+                // }
+                //
+                // // bullet collision packet
+                // else if (header->type == PacketType::BULLET_COLLISION) {
+                //     // WARN: we lose a UDP packet, player doesn't lose as
+                //     much player->health -= 0.2f;
+                // }
             }
         }
     }
@@ -267,12 +277,11 @@ void Client::send_client_packet(const Packet &packet) {
 }
 
 void Client::send_update_packet() {
-    ClientPacket p{
-        .header = {.timestamp = timestamp, .type = PacketType::CLIENT_UPDATE},
-        .x = player->rect.x,
-        .y = player->rect.y,
-        .health = player->health};
-    send_client_packet(create_packet_from<ClientPacket>(p));
+    // ClientPacket p{
+    //     .header = {.timestamp = timestamp, .type =
+    //     PacketType::CLIENT_UPDATE}, .x = player->rect.x, .y = player->rect.y,
+    //     .health = player->health};
+    // send_client_packet(create_packet_from<ClientPacket>(p));
 }
 
 void Client::send_disconnect_packet() {
@@ -316,6 +325,30 @@ void Client::send_bullet_collision_packet(int client_id) {
     bcp.to = client_id;
 
     packet = create_packet_from<BulletCollisionPacket>(bcp);
+
+    // send actual packet
+    sendto(sock,
+           packet.data(),
+           packet.size(),
+           0,
+           (sockaddr *)&serv_addr,
+           sizeof(serv_addr));
+}
+
+void Client::send_input_packet() {
+    InputPacket input;
+    input.left = IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT);
+    input.right = IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT);
+    input.up = IsKeyDown(KEY_W) || IsKeyDown(KEY_UP);
+    input.down = IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN);
+    input.mouse = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    input.header.type = PacketType::INPUT;
+    input.header.timestamp =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+
+    Packet packet = create_packet_from<InputPacket>(input);
 
     // send actual packet
     sendto(sock,

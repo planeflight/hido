@@ -5,51 +5,40 @@
 
 #include <algorithm>
 
+ClientAddr::ClientAddr(sockaddr_in addr) : addr(addr) {}
+
 ClientManager::ClientManager() {}
 
-const ClientAddr &ClientManager::add(sockaddr_in client) {
-    ClientAddr new_client{.addr = client};
-    auto itr = clients.find(new_client);
+ClientAddr &ClientManager::add(sockaddr_in client) {
+    ClientAddr new_client(client);
+    // set starting position
+    new_client.player.rect = {20.0f, 20.0f, 8.0f, 12.0f};
+    auto itr = std::find_if(
+        clients.begin(), clients.end(), [&new_client](const auto &kv) {
+            return kv.second == new_client;
+        });
     // add client if not already contained
     if (itr == clients.end()) {
         new_client.id = idx++;
         spdlog::info("Client {} connected.", new_client.id);
-        clients.insert(new_client);
-        return *clients.find(new_client);
+        auto [itr, _] = clients.emplace(new_client.id, std::move(new_client));
+        return itr->second;
     }
-    return *itr;
+    return itr->second;
 }
 
 void ClientManager::remove(const ClientAddr &c) {
-    auto itr = clients.find(c);
+    auto itr = clients.find(c.id);
     if (itr != clients.end()) {
         clients.erase(itr);
+        spdlog::info("Client {} disconnected.", c.id);
     }
-}
-
-ClientID ClientManager::get(const ClientAddr &c) {
-    auto itr = clients.find(c);
-    if (itr != clients.end()) {
-        return itr->id;
-    }
-    return -1;
-}
-
-ClientID ClientManager::get(sockaddr_in client) {
-    return get(ClientAddr{client});
 }
 
 size_t ClientManager::count() const {
     return clients.size();
 }
 
-const ClientAddr &ClientManager::find_by_id(ClientID id) {
-    auto itr = std::find_if(
-        clients.begin(), clients.end(), [&id](const ClientAddr &addr) -> bool {
-            return id == addr.id;
-        });
-    if (itr == clients.end()) {
-        spdlog::error("Failed to find client {}", id);
-    }
-    return *itr;
+ClientAddr &ClientManager::find_by_id(ClientID id) {
+    return clients[id];
 }

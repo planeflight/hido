@@ -6,14 +6,13 @@
 #include <vector>
 
 #include "map/map.hpp"
-#include "player.hpp"
 
 class Bullet {
   public:
     Bullet(const Rectangle &rect, const Vector2 &vel);
 
     void render(Texture texture);
-    void update(float dt, GameMap &map, const std::vector<Player> &others);
+    // void update(float dt, GameMap &map, const std::vector<Player> &others);
 
     bool get_destroy() const {
         return destroy;

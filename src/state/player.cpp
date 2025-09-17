@@ -2,41 +2,18 @@
 
 #include <raylib.h>
 
-#include <cmath>
-
-#include "map/map.hpp"
-
-Player::Player(const Rectangle &rect) : rect(rect) {}
-
-Player::~Player() {}
-
-void Player::input(float dt) {
-    vel.x = 0.0f;
-    vel.y = 0.0f;
-    if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
-        vel.x = -SPEED;
-    }
-    if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
-        vel.x = SPEED;
-    }
-
-    if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
-        vel.y = SPEED;
-    }
-    if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
-        vel.y = -SPEED;
-    }
-}
-
-void Player::render() {
-    DrawTexture(texture, rect.x, rect.y, WHITE);
+void player_render(const PlayerState &p,
+                   Texture player_texture,
+                   Texture health_texture,
+                   Color color) {
+    DrawTexture(player_texture, p.rect.x, p.rect.y, color);
     // draw health bar
     const float max_width = 14.0f, max_height = 5.0f;
-    const float bar_width = health * (max_width - 2.0f);
+    const float bar_width = p.health * (max_width - 2.0f);
 
     Rectangle health_rect;
-    health_rect.x = rect.x + rect.width / 2.0f - max_width / 2.0f;
-    health_rect.y = rect.y - max_height - 2.0f;
+    health_rect.x = p.rect.x + p.rect.width / 2.0f - max_width / 2.0f;
+    health_rect.y = p.rect.y - max_height - 2.0f;
     health_rect.width = max_width;
     health_rect.height = max_height;
 
@@ -51,17 +28,17 @@ void Player::render() {
                   health_rect.height - 2.0f,
                   Color{150, 80, 250, 255});
     // finally draw the texture
-    DrawTexture(health_bar_texture, health_rect.x, health_rect.y, WHITE);
+    DrawTexture(health_texture, health_rect.x, health_rect.y, WHITE);
 }
 
-void Player::update(float dt, GameMap &map) {
-    rect.x += vel.x * dt;
+void player_update(PlayerState &p, const Vector2 &vel, float dt, GameMap &map) {
+    p.rect.x += vel.x * dt;
 
     std::vector<tmxparser::Tile *> collided_tiles;
     std::vector<unsigned int> collided_tile_indices;
 
     map.get_intersect_rects(
-        rect,
+        p.rect,
         collided_tiles,
         collided_tile_indices,
         [&](tmxparser::Tile *tile, unsigned int tile_idx) -> bool {
@@ -73,31 +50,29 @@ void Player::update(float dt, GameMap &map) {
 
     for (size_t i = 0; i < collided_tiles.size(); ++i) {
         map.set_tile_rect(test_rect, collided_tile_indices[i]);
-        if (CheckCollisionRecs(test_rect, rect)) {
+        if (CheckCollisionRecs(test_rect, p.rect)) {
             std::string out;
             bool blocked =
                 map.contains_property(*collided_tiles[i], "blocked", out);
             if (blocked) {
                 // left
                 if (vel.x < 0.0f) {
-                    rect.x = test_rect.x + test_rect.width;
-                    vel.x = 0.0f;
+                    p.rect.x = test_rect.x + test_rect.width;
                 }
                 // right
                 else if (vel.x > 0.0f) {
-                    rect.x = test_rect.x - rect.width;
-                    vel.x = 0.0f;
+                    p.rect.x = test_rect.x - p.rect.width;
                 }
             }
         }
     }
 
     // resolve movement axes separately
-    rect.y += vel.y * dt;
+    p.rect.y += vel.y * dt;
     collided_tiles.clear();
     collided_tile_indices.clear();
     map.get_intersect_rects(
-        rect,
+        p.rect,
         collided_tiles,
         collided_tile_indices,
         [&](tmxparser::Tile *tile, unsigned int tile_idx) -> bool {
@@ -107,22 +82,28 @@ void Player::update(float dt, GameMap &map) {
         });
     for (size_t i = 0; i < collided_tiles.size(); ++i) {
         map.set_tile_rect(test_rect, collided_tile_indices[i]);
-        if (CheckCollisionRecs(test_rect, rect)) {
+        if (CheckCollisionRecs(test_rect, p.rect)) {
             std::string out;
             bool blocked =
                 map.contains_property(*collided_tiles[i], "blocked", out);
             if (blocked) {
                 // up
                 if (vel.y < 0.0f) {
-                    rect.y = test_rect.y + test_rect.height;
-                    vel.y = 0.0f;
+                    p.rect.y = test_rect.y + test_rect.height;
                 }
                 // right
                 else if (vel.y > 0.0f) {
-                    rect.y = test_rect.y - rect.height;
-                    vel.y = 0.0f;
+                    p.rect.y = test_rect.y - p.rect.height;
                 }
             }
         }
     }
+}
+
+PlayerState player_lerp(const PlayerState &a, const PlayerState &b, float t) {
+    PlayerState state = a;
+    state.rect.x = a.rect.x + t * (b.rect.x - a.rect.x);
+    state.rect.y = a.rect.y + t * (b.rect.y - a.rect.y);
+    state.health = a.health + t * (b.health - a.health);
+    return state;
 }

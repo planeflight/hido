@@ -51,6 +51,7 @@ class Client {
 
     // textures
     Texture player_texture, bullet_texture, health_bar_texture;
+    Camera2D camera;
 };
 
 #endif // CLIENT_HPP

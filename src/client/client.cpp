@@ -54,7 +54,6 @@ void Client::run() {
     bullet_texture = LoadTexture("./res/bullet.png");
     health_bar_texture = LoadTexture("./res/health_bar.png");
 
-    Camera2D camera;
     camera.zoom = 3.0f;
     camera.offset = {WIDTH / 2.0f, HEIGHT / 2.0f};
     camera.rotation = 0.0f;
@@ -73,13 +72,6 @@ void Client::run() {
         //         bullets.erase(bullets.begin() + i);
         //     }
         // }
-
-        // camera.target.x +=
-        //     (player->rect.x + player->rect.width / 2.0f - camera.target.x) *
-        //     0.05f;
-        // camera.target.y +=
-        //     (player->rect.y + player->rect.height / 2.0f - camera.target.y) *
-        //     0.05f;
 
         // check if this client's bullets hit any clients
         // for (auto itr = bullets.begin(); itr != bullets.end(); itr++) {
@@ -182,29 +174,37 @@ void Client::render_state(uint64_t render_time) {
 
     // draw other players in different color
     for (size_t i = 0; i < b.num_players; ++i) {
-        auto &player_b = b.players[i];
-        // draw others in red
-        Color color = {207, 87, 80, 255};
-        if (player_b.id == b.client_id) {
-            color = WHITE;
-        }
+        const PlayerState &player_b = b.players[i];
         // try find this player in previous frame (A)
         auto itr = std::find_if(a.players.begin(),
                                 a.players.end(),
                                 [&player_b](const PlayerState &state) {
                                     return state.id == player_b.id;
                                 });
+        // default is latest frame (B)
+        PlayerState resolved_player_state = player_b;
         // if existed on last frame, lerp
         if (itr != a.players.end()) {
-            player_render(player_lerp(*itr, player_b, t),
-                          player_texture,
-                          health_bar_texture,
-                          color);
+            resolved_player_state = player_lerp(*itr, player_b, t);
         }
-        // otherwise just render latest frame (B)
-        else {
-            player_render(player_b, player_texture, health_bar_texture, color);
+        // draw others in red
+        Color color = {207, 87, 80, 255};
+        // if this players data
+        if (player_b.id == b.client_id) {
+            // update camera for next frame
+            camera.target.x +=
+                (resolved_player_state.rect.x +
+                 resolved_player_state.rect.width / 2.0f - camera.target.x) *
+                0.05f;
+            camera.target.y +=
+                (resolved_player_state.rect.y +
+                 resolved_player_state.rect.height / 2.0f - camera.target.y) *
+                0.05f;
+            // update color
+            color = WHITE;
         }
+        player_render(
+            resolved_player_state, player_texture, health_bar_texture, color);
     }
 }
 

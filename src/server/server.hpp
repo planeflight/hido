@@ -37,6 +37,7 @@ class Server {
 
     ClientManager manager;
     std::vector<BulletState> bullet_state;
+    int bullet_idx = 0;
 };
 
 #endif // SERVER_HPP

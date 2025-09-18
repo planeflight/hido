@@ -112,14 +112,7 @@ void Client::run() {
         }
         if (bullet_state_buffer.size() >= 2) {
             uint64_t render_time = get_render_time();
-            auto &bsp = bullet_state_buffer.back();
-            for (int i = 0; i < bsp.num_bullets; i++) {
-                Color color = WHITE;
-                if (client_id >= 0 && bsp.bullets[i].sender != client_id) {
-                    color = Color{50, 20, 235, 255};
-                }
-                bullet_render(bsp.bullets[i].pos, bullet_texture, color);
-            }
+            render_bullets(render_time);
         }
         EndMode2D();
         EndDrawing();
@@ -134,13 +127,10 @@ void Client::run() {
 }
 
 void Client::render_state(uint64_t render_time) {
-    // trim state buffer
     std::lock_guard<std::mutex> state_lock_guard(state_mutex);
-    // force second element to be after render_time and
-    while (game_state_buffer.size() >= 2 &&
-           game_state_buffer[1].header.timestamp <= render_time) {
-        game_state_buffer.pop_front();
-    }
+    // trim state buffer
+    // force second element to be after render_time
+    game_state_buffer.remove_unused(render_time);
 
     // draw the lerped states
     auto &a = game_state_buffer[0];
@@ -185,6 +175,34 @@ void Client::render_state(uint64_t render_time) {
     }
 }
 
+void Client::render_bullets(uint64_t render_time) {
+    std::lock_guard<std::mutex> state_lock_guard(state_mutex);
+    bullet_state_buffer.remove_unused(render_time);
+    auto &a = bullet_state_buffer[0];
+    auto &b = bullet_state_buffer[1];
+    for (size_t i = 0; i < b.num_bullets; ++i) {
+        auto &bullet_b = b.bullets[i];
+        // find in a
+        auto itr = std::find_if(b.bullets.begin(),
+                                b.bullets.end(),
+                                [&bullet_b](BulletPacket &bp) -> bool {
+                                    return bullet_b.id == bp.id;
+                                });
+        Color color = WHITE;
+        if (client_id >= 0 && b.bullets[i].sender != client_id) {
+            color = Color{50, 20, 235, 255};
+        }
+        // if found
+        if (itr != b.bullets.end()) {
+            float t = (render_time - a.header.timestamp) /
+                      float(b.header.timestamp - a.header.timestamp);
+            bullet_render(
+                Vector2Lerp(itr->pos, bullet_b.pos, t), bullet_texture, color);
+        } else {
+            bullet_render(bullet_b.pos, bullet_texture, color);
+        }
+    }
+}
 void Client::listen_thread() {
     Packet packet;
     pollfd fds[1];

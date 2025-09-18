@@ -9,7 +9,7 @@ constexpr float BULLET_SIZE = 6.0f;
 
 struct BulletState {
     uint64_t timestamp = 0;
-    int sender = 0;
+    int sender = 0, id = -1;
     Vector2 pos, vel;
 };
 

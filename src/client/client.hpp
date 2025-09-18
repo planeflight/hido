@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "network.hpp"
+#include "state_buffer.hpp"
 
 class Client {
   public:
@@ -21,6 +22,7 @@ class Client {
 
   private:
     void render_state(uint64_t render_time);
+    void render_bullets(uint64_t render_time);
 
     void listen_thread();
     void send_client_packet(const Packet &packet);
@@ -34,8 +36,8 @@ class Client {
     constexpr static int WIDTH = 720, HEIGHT = 720;
 
     int client_id = -1;
-    std::deque<GameStatePacket> game_state_buffer;
-    std::deque<BulletStatePacket> bullet_state_buffer;
+    StateBuffer<GameStatePacket> game_state_buffer;
+    StateBuffer<BulletStatePacket> bullet_state_buffer;
 
     // any other enemy bullets <id, <timestamp, bullet_list>>
     std::unordered_map<int, std::pair<uint32_t, std::vector<BulletPacket>>>

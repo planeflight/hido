@@ -182,8 +182,12 @@ void Server::update(float dt) {
             direction = Vector2Normalize(direction);
             Vector2 vel = Vector2Scale(direction, 300.0f);
             uint64_t t = get_now_millis();
-            bullet_state.push_back(BulletState{
-                t, player.id, Vector2{player.rect.x, player.rect.y}, vel});
+            bullet_state.push_back(
+                BulletState{t,
+                            player.id,
+                            bullet_idx++,
+                            Vector2{player.rect.x, player.rect.y},
+                            vel});
         }
     }
     // move bullets
@@ -256,10 +260,12 @@ void Server::send_bullet_state(uint64_t timestamp) {
     bsp.header.type = PacketType::BULLET;
     bsp.header.timestamp = timestamp;
     bsp.num_bullets = std::min(MAX_BULLETS_PER_PACKET, bullet_state.size());
+    // TODO: alternate sending bullets every frame for more space
     // add bullet packets
     for (size_t i = 0; i < bsp.num_bullets; ++i) {
-        // copy sender and pos
+        // copy sender, id and pos
         bsp.bullets[i].sender = bullet_state[i].sender;
+        bsp.bullets[i].id = bullet_state[i].id;
         bsp.bullets[i].pos = bullet_state[i].pos;
     }
     Packet packet = create_packet_from<BulletStatePacket>(bsp);

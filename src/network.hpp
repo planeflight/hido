@@ -64,7 +64,7 @@ struct GameStatePacket {
 };
 
 struct BulletPacket {
-    int sender = -1;
+    int sender = -1, id = -1;
     Vector2 pos;
 };
 constexpr size_t MAX_BULLETS_PER_PACKET =
@@ -73,7 +73,7 @@ constexpr size_t MAX_BULLETS_PER_PACKET =
 struct BulletStatePacket {
     PacketHeader header;
     int num_bullets = 0;
-    BulletPacket bullets[MAX_BULLETS_PER_PACKET];
+    std::array<BulletPacket, MAX_BULLETS_PER_PACKET> bullets;
 };
 
 /**

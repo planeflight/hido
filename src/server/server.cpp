@@ -14,6 +14,7 @@
 #include <cstring>
 #include <set>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "network.hpp"
@@ -194,7 +195,10 @@ void Server::update(float dt) {
     for (auto itr = bullet_state.begin(); itr != bullet_state.end(); ++itr) {
         bool wall_collision = bullet_update(*itr, dt, *map);
         if (wall_collision) {
-            bullet_state.erase(itr);
+            // smart erase is marginally faster than classic erase despite
+            // memmove optimizations
+            std::swap(*itr, bullet_state.back());
+            bullet_state.pop_back();
             itr--;
         }
     }
@@ -216,7 +220,10 @@ void Server::update(float dt) {
             if (CheckCollisionRecs(
                     player.rect,
                     {itr->pos.x, itr->pos.y, BULLET_SIZE, BULLET_SIZE})) {
-                bullet_state.erase(itr);
+                // smart erase is marginally faster than classic erase despite
+                // memmove optimizations
+                std::swap(*itr, bullet_state.back());
+                bullet_state.pop_back();
                 itr--;
                 player.health -= 0.2f;
             }

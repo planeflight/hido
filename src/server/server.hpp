@@ -9,7 +9,6 @@
 #include <memory>
 
 #include "map/map.hpp"
-#include "network.hpp"
 #include "server/client_manager.hpp"
 #include "state/bullet.hpp"
 

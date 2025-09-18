@@ -15,8 +15,7 @@ class StateBuffer {
     // force second element to be after render_time
     // shorten such that a=buffer[0] < render_time < b=buffer[1]
     void remove_unused(uint64_t render_time) {
-        while (buffer.size() >= 2 &&
-               buffer[1].header.timestamp <= render_time) {
+        while (buffer.size() > 2 && buffer[1].header.timestamp <= render_time) {
             buffer.pop_front();
         }
     }

@@ -11,7 +11,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "bullet.hpp"
 #include "network.hpp"
 
 class Client {
@@ -25,10 +24,7 @@ class Client {
 
     void listen_thread();
     void send_client_packet(const Packet &packet);
-    void send_update_packet();
     void send_disconnect_packet();
-    void send_bullet_packet();
-    void send_bullet_collision_packet(int client_id);
     void send_input_packet();
 
     int sock = 0;
@@ -37,10 +33,9 @@ class Client {
 
     constexpr static int WIDTH = 720, HEIGHT = 720;
 
-    std::deque<GameStatePacket> state_buffer;
+    std::deque<GameStatePacket> game_state_buffer;
+    std::deque<BulletStatePacket> bullet_state_buffer;
 
-    // this player's bullets
-    std::vector<Bullet> bullets;
     // any other enemy bullets <id, <timestamp, bullet_list>>
     std::unordered_map<int, std::pair<uint32_t, std::vector<BulletPacket>>>
         latest_enemy_bullet;

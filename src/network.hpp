@@ -2,6 +2,7 @@
 #define NETWORK_HPP
 
 #include <netinet/in.h>
+#include <raylib.h>
 
 #include <array>
 #include <cstddef>
@@ -28,8 +29,7 @@ enum class PacketType : uint8_t {
 struct PacketHeader {
     uint64_t timestamp = 0; // millis
     PacketType type;
-    int8_t sender = -1;
-    uint16_t size; // optional if not a dynamic buffer
+    int sender = -1;
 };
 
 constexpr size_t MAX_PACKET_SIZE = ETHERNET_MTU - sizeof(PacketHeader);
@@ -43,9 +43,6 @@ struct ClientPacket {
     PacketHeader header;
     float x, y, health;
 };
-struct BulletPacket {
-    float x, y;
-};
 
 struct BulletCollisionPacket {
     PacketHeader header;
@@ -54,7 +51,8 @@ struct BulletCollisionPacket {
 
 struct InputPacket {
     PacketHeader header;
-    bool left, right, up, down, mouse;
+    bool left, right, up, down, mouse_down;
+    Vector2 mouse_pos;
 };
 
 struct GameStatePacket {
@@ -62,6 +60,19 @@ struct GameStatePacket {
     int8_t num_players = 0;
     int client_id = 0; // tells clients what their id is
     std::array<PlayerState, MAX_PLAYERS> players;
+};
+
+struct BulletPacket {
+    int sender = -1;
+    Vector2 pos;
+};
+constexpr size_t MAX_BULLETS_PER_PACKET =
+    MAX_PACKET_SIZE / sizeof(BulletPacket);
+
+struct BulletStatePacket {
+    PacketHeader header;
+    int num_bullets = 0;
+    BulletPacket bullets[MAX_BULLETS_PER_PACKET];
 };
 
 /**

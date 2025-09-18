@@ -14,10 +14,10 @@
 #include <mutex>
 #include <thread>
 
-#include "bullet.hpp"
 #include "map/map.hpp"
 #include "map/map_renderer.hpp"
 #include "network.hpp"
+#include "state/bullet.hpp"
 #include "state/player.hpp"
 #include "util.hpp"
 
@@ -105,7 +105,7 @@ void Client::run() {
         BeginMode2D(camera);
         map_renderer.render();
 
-        if (state_buffer.size() >= 2) {
+        if (game_state_buffer.size() >= 2) {
             // get render time
             uint64_t now =
                 std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -114,6 +114,18 @@ void Client::run() {
             uint64_t render_time = now - INTERPOLATION_DELAY;
 
             render_state(render_time);
+        }
+        if (bullet_state_buffer.size() >= 2) {
+            // get render time
+            uint64_t now =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch())
+                    .count();
+            uint64_t render_time = now - INTERPOLATION_DELAY;
+            auto &bsp = bullet_state_buffer.back();
+            for (int i = 0; i < bsp.num_bullets; i++) {
+                bullet_render(bsp.bullets[i].pos, bullet_texture);
+            }
         }
         // for (Bullet &b : bullets) {
         //     b.render(bullet_texture);
@@ -161,14 +173,14 @@ void Client::render_state(uint64_t render_time) {
     // trim state buffer
     std::lock_guard<std::mutex> state_lock_guard(state_mutex);
     // force second element to be after render_time and
-    while (state_buffer.size() >= 2 &&
-           state_buffer[1].header.timestamp <= render_time) {
-        state_buffer.pop_front();
+    while (game_state_buffer.size() >= 2 &&
+           game_state_buffer[1].header.timestamp <= render_time) {
+        game_state_buffer.pop_front();
     }
 
     // draw the lerped states
-    auto &a = state_buffer[0];
-    auto &b = state_buffer[1];
+    auto &a = game_state_buffer[0];
+    auto &b = game_state_buffer[1];
     float t = (render_time - a.header.timestamp) /
               float(b.header.timestamp - a.header.timestamp);
 
@@ -237,7 +249,11 @@ void Client::listen_thread() {
                     GameStatePacket *gsp =
                         get_packet_data<GameStatePacket>(packet);
                     std::lock_guard<std::mutex> lock_guard(state_mutex);
-                    state_buffer.push_back(*gsp);
+                    game_state_buffer.push_back(*gsp);
+                } else if (header->type == PacketType::BULLET) {
+                    BulletStatePacket *bsp =
+                        get_packet_data<BulletStatePacket>(packet);
+                    bullet_state_buffer.push_back(*bsp);
                 }
 
                 // // bullet packet
@@ -276,14 +292,6 @@ void Client::send_client_packet(const Packet &packet) {
            sizeof(serv_addr));
 }
 
-void Client::send_update_packet() {
-    // ClientPacket p{
-    //     .header = {.timestamp = timestamp, .type =
-    //     PacketType::CLIENT_UPDATE}, .x = player->rect.x, .y = player->rect.y,
-    //     .health = player->health};
-    // send_client_packet(create_packet_from<ClientPacket>(p));
-}
-
 void Client::send_disconnect_packet() {
     ClientPacket p{.header = {.timestamp = timestamp,
                               .type = PacketType::CLIENT_DISCONNECT},
@@ -292,56 +300,16 @@ void Client::send_disconnect_packet() {
     send_client_packet(create_packet_from<ClientPacket>(p));
 }
 
-void Client::send_bullet_packet() {
-    // even send if there are 0 bullets since clients have to know what bullets
-    // are present
-    const size_t n = bullets.size();
-
-    // construct actual packet
-    std::vector<BulletPacket> bpackets;
-    bpackets.resize(n);
-    for (size_t i = 0; i < n; ++i) {
-        const Vector2 &pos = bullets[i].get_pos();
-        bpackets[i] = BulletPacket{.x = pos.x, .y = pos.y};
-    }
-    PacketHeader header;
-    header.type = PacketType::BULLET;
-    header.timestamp = timestamp; // same frame as the sending of updates
-
-    Packet packet = create_bullet_packet(header, bpackets);
-    // send actual packet
-    sendto(sock,
-           packet.data(),
-           packet.size(),
-           0,
-           (sockaddr *)&serv_addr,
-           sizeof(serv_addr));
-}
-
-void Client::send_bullet_collision_packet(int client_id) {
-    Packet packet;
-    BulletCollisionPacket bcp;
-    bcp.header = {.timestamp = timestamp, .type = PacketType::BULLET_COLLISION};
-    bcp.to = client_id;
-
-    packet = create_packet_from<BulletCollisionPacket>(bcp);
-
-    // send actual packet
-    sendto(sock,
-           packet.data(),
-           packet.size(),
-           0,
-           (sockaddr *)&serv_addr,
-           sizeof(serv_addr));
-}
-
 void Client::send_input_packet() {
     InputPacket input;
     input.left = IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT);
     input.right = IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT);
     input.up = IsKeyDown(KEY_W) || IsKeyDown(KEY_UP);
     input.down = IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN);
-    input.mouse = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    input.mouse_down = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    // convert mouse position to world coordinates
+    input.mouse_pos = GetScreenToWorld2D(GetMousePosition(), camera);
+
     input.header.type = PacketType::INPUT;
     input.header.timestamp =
         std::chrono::duration_cast<std::chrono::milliseconds>(

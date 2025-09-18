@@ -2,6 +2,7 @@
 
 #include <netinet/in.h>
 #include <poll.h>
+#include <raymath.h>
 #include <spdlog/spdlog.h>
 #include <sys/epoll.h>
 #include <sys/poll.h>
@@ -16,6 +17,7 @@
 
 #include "network.hpp"
 #include "server/client_manager.hpp"
+#include "state/bullet.hpp"
 #include "state/player.hpp"
 
 Server::Server(uint32_t port) {
@@ -95,6 +97,7 @@ void Server::serve() {
                     now.time_since_epoch())
                     .count();
             send_game_state(timestamp);
+            send_bullet_state(timestamp);
         }
     }
 }
@@ -170,19 +173,24 @@ void Server::update(float dt) {
         Vector2 vel{(input.right - input.left) * PLAYER_SPEED,
                     (input.down - input.up) * PLAYER_SPEED};
         player_update(player, vel, dt, *map);
+        // bullets
+        if (input.mouse_down) {
+            Vector2 direction = Vector2Subtract(input.mouse_pos,
+                                                {player.rect.x, player.rect.y});
+            direction = Vector2Normalize(direction);
+            Vector2 vel = Vector2Scale(direction, 300.0f);
+            bullet_state.push_back(BulletState{
+                player.id, Vector2{player.rect.x, player.rect.y}, vel});
+        }
     }
-    // if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-    //     Vector2 direction,
-    //         mouse_pos = GetMousePosition(),
-    //         world_pos = GetScreenToWorld2D(mouse_pos, camera);
-    //     direction.x = world_pos.x - player->rect.x;
-    //     direction.y = world_pos.y - player->rect.y;
-    //     direction = Vector2Normalize(direction);
-    //
-    //     bullets.push_back(
-    //         Bullet(Rectangle{player->rect.x, player->rect.y, 6.0f, 6.0f},
-    //                direction));
-    // }
+    // update bullets
+    for (auto itr = bullet_state.begin(); itr != bullet_state.end(); ++itr) {
+        bool destroy = bullet_update(*itr, dt, *map);
+        if (destroy) {
+            bullet_state.erase(itr);
+            itr--;
+        }
+    }
 }
 
 void Server::send_game_state(uint64_t timestamp) {
@@ -206,6 +214,30 @@ void Server::send_game_state(uint64_t timestamp) {
         size_t offset = offsetof(GameStatePacket, client_id);
         memcpy(packet.data() + offset, &client.first, sizeof(gsp.client_id));
 
+        // send the packet
+        sendto(sock,
+               packet.data(),
+               packet.size(),
+               0,
+               (sockaddr *)&client.second.addr,
+               sizeof(client.second.addr));
+    }
+}
+
+void Server::send_bullet_state(uint64_t timestamp) {
+    BulletStatePacket bsp;
+    bsp.header.type = PacketType::BULLET;
+    bsp.header.timestamp = timestamp;
+    bsp.num_bullets = std::min(MAX_BULLETS_PER_PACKET, bullet_state.size());
+    // add bullet packets
+    for (size_t i = 0; i < bsp.num_bullets; ++i) {
+        // copy sender and pos
+        bsp.bullets[i].sender = bullet_state[i].sender;
+        bsp.bullets[i].pos = bullet_state[i].pos;
+    }
+    Packet packet = create_packet_from<BulletStatePacket>(bsp);
+    // send packet to clients
+    for (auto &client : manager.get_clients()) {
         // send the packet
         sendto(sock,
                packet.data(),

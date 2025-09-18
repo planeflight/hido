@@ -19,6 +19,7 @@ set(SRC
     src/server/main.cpp
     src/map/map.cpp
     src/state/player.cpp
+    src/state/bullet.cpp
     src/network.cpp
     src/util.cpp
 )
@@ -30,7 +31,7 @@ add_executable(client
     src/map/map.cpp
     src/map/map_renderer.cpp
     src/state/player.cpp
-    src/bullet.cpp
+    src/state/bullet.cpp
     src/network.cpp
     src/util.cpp
 )

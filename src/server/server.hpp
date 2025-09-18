@@ -11,6 +11,7 @@
 #include "map/map.hpp"
 #include "network.hpp"
 #include "server/client_manager.hpp"
+#include "state/bullet.hpp"
 
 class Server {
   public:
@@ -25,6 +26,7 @@ class Server {
     void process_events();
     void update(float dt);
     void send_game_state(uint64_t timestamp);
+    void send_bullet_state(uint64_t timestamp);
 
     int sock = 0;
     int epfd = 0;
@@ -33,6 +35,7 @@ class Server {
     ClientManager manager;
 
     std::set<Packet> input_packets;
+    std::vector<BulletState> bullet_state;
 
     // world objects
     std::unique_ptr<GameMap> map = nullptr;

@@ -5,6 +5,7 @@
 #include <raylib.h>
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -16,9 +17,9 @@ constexpr size_t ETHERNET_MTU = 1500;
 constexpr size_t MAX_PLAYERS = 5;
 // since packets take time to arrive
 constexpr uint64_t INTERPOLATION_DELAY = 100;
+constexpr uint32_t TICK_INTERVAL = 1000 / 60;
 
 enum class PacketType : uint8_t {
-    CLIENT_UPDATE = 0,
     CLIENT_DISCONNECT,
     BULLET,
     BULLET_COLLISION,
@@ -76,8 +77,7 @@ struct BulletStatePacket {
 };
 
 /**
- * Create a packet from a packet type such as ClientPacket,
- * BulletCollisionPacket. Just copies the data
+ * Create a packet from a packet type such as InputPacket
  * */
 template <typename T>
 Packet create_packet_from(const T &packet) {
@@ -94,9 +94,14 @@ T *get_packet_data(Packet &packet) {
 
 PacketHeader *get_header(Packet &packet);
 
-Packet create_bullet_packet(PacketHeader building_header,
-                            const std::vector<BulletPacket> &bullets);
+inline uint64_t get_now_millis() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
 
-void get_bullet_data(Packet &packet, std::vector<BulletPacket> &bullets);
+inline uint64_t get_render_time() {
+    return get_now_millis() - INTERPOLATION_DELAY;
+}
 
 #endif // NETWORK_HPP

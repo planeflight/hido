@@ -106,57 +106,21 @@ void Client::run() {
         map_renderer.render();
 
         if (game_state_buffer.size() >= 2) {
-            // get render time
-            uint64_t now =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now().time_since_epoch())
-                    .count();
-            uint64_t render_time = now - INTERPOLATION_DELAY;
+            uint64_t render_time = get_render_time();
 
             render_state(render_time);
         }
         if (bullet_state_buffer.size() >= 2) {
-            // get render time
-            uint64_t now =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now().time_since_epoch())
-                    .count();
-            uint64_t render_time = now - INTERPOLATION_DELAY;
+            uint64_t render_time = get_render_time();
             auto &bsp = bullet_state_buffer.back();
             for (int i = 0; i < bsp.num_bullets; i++) {
-                bullet_render(bsp.bullets[i].pos, bullet_texture);
+                Color color = WHITE;
+                if (client_id >= 0 && bsp.bullets[i].sender != client_id) {
+                    color = Color{50, 20, 235, 255};
+                }
+                bullet_render(bsp.bullets[i].pos, bullet_texture, color);
             }
         }
-        // for (Bullet &b : bullets) {
-        //     b.render(bullet_texture);
-        // }
-        // // draw other bullets
-        // {
-        //     const std::lock_guard<std::mutex>
-        //     bullet_lock_guard(bullets_mutex); for (const auto &enemy_bullets
-        //     : latest_enemy_bullet) {
-        //         for (const BulletPacket &packet :
-        //         enemy_bullets.second.second) {
-        //             Bullet b(Rectangle{packet.x, packet.y, 6.0f, 6.0f}, {});
-        //             b.render(bullet_texture);
-        //         }
-        //     }
-        // }
-        //
-        // // draw other clients
-        // {
-        //     const std::lock_guard<std::mutex>
-        //     client_lock_guard(clients_mutex); for (auto &client_packet :
-        //     clients) {
-        //         ClientPacket *client =
-        //             get_packet_data<ClientPacket>(client_packet);
-        //         Player c{Rectangle{client->x, client->y, 8.0f, 12.0f}};
-        //         c.texture = player_texture;
-        //         c.health_bar_texture = health_bar_texture;
-        //         c.health = client->health;
-        //         c.render();
-        //     }
-        // }
         EndMode2D();
         EndDrawing();
     }
@@ -203,6 +167,7 @@ void Client::render_state(uint64_t render_time) {
         Color color = {207, 87, 80, 255};
         // if this players data
         if (player_b.id == b.client_id) {
+            client_id = b.client_id; // save it for any other cases
             // update camera for next frame
             camera.target.x +=
                 (resolved_player_state.rect.x +
@@ -311,10 +276,7 @@ void Client::send_input_packet() {
     input.mouse_pos = GetScreenToWorld2D(GetMousePosition(), camera);
 
     input.header.type = PacketType::INPUT;
-    input.header.timestamp =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch())
-            .count();
+    input.header.timestamp = get_now_millis();
 
     Packet packet = create_packet_from<InputPacket>(input);
 

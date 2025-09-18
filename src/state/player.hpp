@@ -5,7 +5,7 @@
 
 #include "map/map.hpp"
 
-constexpr static float PLAYER_SPEED = 80.0f;
+constexpr float PLAYER_SPEED = 80.0f;
 
 struct PlayerState {
     Rectangle rect;

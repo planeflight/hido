@@ -33,6 +33,7 @@ class Client {
 
     constexpr static int WIDTH = 720, HEIGHT = 720;
 
+    int client_id = -1;
     std::deque<GameStatePacket> game_state_buffer;
     std::deque<BulletStatePacket> bullet_state_buffer;
 

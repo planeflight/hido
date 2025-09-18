@@ -10,6 +10,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <set>
 #include <thread>
@@ -69,7 +70,7 @@ void Server::serve() {
 
     auto last_t = std::chrono::steady_clock::now();
 
-    const auto tick_interval = std::chrono::milliseconds((uint32_t)1000 / 60);
+    const auto tick_interval = std::chrono::milliseconds(TICK_INTERVAL);
 
     map = std::make_unique<GameMap>("./res/map/map1.tmx", "./res/map");
 
@@ -167,6 +168,7 @@ void Server::process_events() {
 }
 
 void Server::update(float dt) {
+    // update clients
     for (auto &client : manager.get_clients()) {
         auto &player = client.second.player;
         auto &input = client.second.last_input;
@@ -179,16 +181,41 @@ void Server::update(float dt) {
                                                 {player.rect.x, player.rect.y});
             direction = Vector2Normalize(direction);
             Vector2 vel = Vector2Scale(direction, 300.0f);
+            uint64_t t = get_now_millis();
             bullet_state.push_back(BulletState{
-                player.id, Vector2{player.rect.x, player.rect.y}, vel});
+                t, player.id, Vector2{player.rect.x, player.rect.y}, vel});
         }
     }
-    // update bullets
+    // move bullets
     for (auto itr = bullet_state.begin(); itr != bullet_state.end(); ++itr) {
-        bool destroy = bullet_update(*itr, dt, *map);
-        if (destroy) {
+        bool wall_collision = bullet_update(*itr, dt, *map);
+        if (wall_collision) {
             bullet_state.erase(itr);
             itr--;
+        }
+    }
+    // check if bullets hit any clients
+    for (auto itr = bullet_state.begin(); itr != bullet_state.end(); ++itr) {
+        for (auto &client : manager.get_clients()) {
+            // check if client and bullet have reasonable timestamp similarity
+            uint64_t a = itr->timestamp,
+                     b = client.second.last_input.header.timestamp;
+            uint64_t diff = a > b ? a - b : b - a;
+            // if they're within a frame
+            if (std::abs((int64_t)diff) > TICK_INTERVAL) {
+                continue;
+            }
+
+            auto &player = client.second.player;
+            // only non-player's bullets can hurt
+            if (player.id == itr->sender) continue;
+            if (CheckCollisionRecs(
+                    player.rect,
+                    {itr->pos.x, itr->pos.y, BULLET_SIZE, BULLET_SIZE})) {
+                bullet_state.erase(itr);
+                itr--;
+                player.health -= 0.2f;
+            }
         }
     }
 }

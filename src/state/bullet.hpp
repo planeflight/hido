@@ -5,15 +5,16 @@
 
 #include "map/map.hpp"
 
-constexpr static float BULLET_SIZE = 6.0f;
+constexpr float BULLET_SIZE = 6.0f;
 
 struct BulletState {
+    uint64_t timestamp = 0;
     int sender = 0;
     Vector2 pos, vel;
 };
 
 bool bullet_update(BulletState &b, float dt, GameMap &map);
 
-void bullet_render(const Vector2 &pos, Texture bullet_texture);
+void bullet_render(const Vector2 &pos, Texture bullet_texture, Color color);
 
 #endif // STATE_BULLET_HPP

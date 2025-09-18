@@ -3,7 +3,10 @@
 #include <raylib.h>
 
 #include "map/map.hpp"
+#include "network.hpp"
+
 bool bullet_update(BulletState &b, float dt, GameMap &map) {
+    b.timestamp = get_now_millis();
     b.pos.x += b.vel.x * dt;
     b.pos.y += b.vel.y * dt;
 
@@ -36,12 +39,12 @@ bool bullet_update(BulletState &b, float dt, GameMap &map) {
     return false;
 }
 
-void bullet_render(const Vector2 &pos, Texture bullet_texture) {
+void bullet_render(const Vector2 &pos, Texture bullet_texture, Color color) {
     DrawTexturePro(
         bullet_texture,
         {0.0f, 0.0f, (float)bullet_texture.width, (float)bullet_texture.height},
         {pos.x, pos.y, BULLET_SIZE, BULLET_SIZE},
         {0.0f, 0.0f},
         0.0f,
-        WHITE);
+        color);
 }

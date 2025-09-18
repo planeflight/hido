@@ -32,13 +32,11 @@ class Server {
     int epfd = 0;
     std::atomic<bool> running = true;
 
-    ClientManager manager;
-
-    std::set<Packet> input_packets;
-    std::vector<BulletState> bullet_state;
-
     // world objects
     std::unique_ptr<GameMap> map = nullptr;
+
+    ClientManager manager;
+    std::vector<BulletState> bullet_state;
 };
 
 #endif // SERVER_HPP

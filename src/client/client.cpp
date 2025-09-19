@@ -10,7 +10,6 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <memory>
 #include <mutex>
 #include <thread>
 
@@ -19,16 +18,16 @@
 #include "network.hpp"
 #include "state/bullet.hpp"
 #include "state/player.hpp"
-#include "util.hpp"
 
-Client::Client(int port) {
+Client::Client(const std::string &addr, uint32_t port) {
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
-    inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr);
+    inet_pton(AF_INET, addr.c_str(), &serv_addr.sin_addr);
 
     if (connect(sock, (sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         spdlog::error("Error opening client connection.");
+        running = false;
         return;
     }
     spdlog::info("Successfully established client connection.");
@@ -44,6 +43,7 @@ Client::~Client() {
 }
 
 void Client::run() {
+    if (!running) return;
     spdlog::info("Running client.");
     std::thread listening{[&]() { listen_thread(); }};
 
@@ -62,42 +62,11 @@ void Client::run() {
     GameMap map("./res/map/map1.tmx", "./res/map");
     MapRenderer map_renderer(&map, "./res/map");
     while (!WindowShouldClose()) {
+        // network updates
+
         // get input and send packet
         send_input_packet();
-
-        // update
-        // for (int i = bullets.size() - 1; i >= 0; --i) {
-        //     bullets[i].update(dt, map, {});
-        //     if (bullets[i].get_destroy()) {
-        //         bullets.erase(bullets.begin() + i);
-        //     }
-        // }
-
-        // check if this client's bullets hit any clients
-        // for (auto itr = bullets.begin(); itr != bullets.end(); itr++) {
-        //     Bullet &bullet = *itr;
-        //     Rectangle bullet_rect{
-        //         bullet.get_pos().x, bullet.get_pos().y, 6.0f, 6.0f};
-        //     std::lock_guard<std::mutex> client_lock_guard(clients_mutex);
-        //
-        //     for (Packet &packet : clients) {
-        //         ClientPacket *c = get_packet_data<ClientPacket>(packet);
-        //         Rectangle client_rect{c->x, c->y, 8.0f, 12.0f};
-        //         // if collision, send collided message
-        //         if (CheckCollisionRecs(client_rect, bullet_rect)) {
-        //             // send_bullet_collision_packet(c->header.sender);
-        //             bullets.erase(itr);
-        //             itr--;
-        //             // no need to check the other clients
-        //             break;
-        //         }
-        //     }
-        // }
-
-        // network updates
         timestamp++;
-        // send_update_packet();
-        // send_bullet_packet();
 
         // render
         BeginDrawing();
@@ -107,7 +76,6 @@ void Client::run() {
 
         if (game_state_buffer.size() >= 2) {
             uint64_t render_time = get_render_time();
-
             render_state(render_time);
         }
         if (bullet_state_buffer.size() >= 2) {
@@ -236,30 +204,9 @@ void Client::listen_thread() {
                 } else if (header->type == PacketType::BULLET) {
                     BulletStatePacket *bsp =
                         get_packet_data<BulletStatePacket>(packet);
+                    std::lock_guard<std::mutex> lock_guard(state_mutex);
                     bullet_state_buffer.push_back(*bsp);
                 }
-
-                // // bullet packet
-                // else if (header->type == PacketType::BULLET) {
-                //     std::vector<BulletPacket> enemy_bullets;
-                //     get_bullet_data(packet, enemy_bullets);
-                //     const std::lock_guard<std::mutex> bullet_lock(
-                //         bullets_mutex);
-                //
-                //     auto &last_enemy_bullet =
-                //         latest_enemy_bullet[header->sender];
-                //     // update if timestamp is more recent
-                //     if (header->timestamp > last_enemy_bullet.first) {
-                //         last_enemy_bullet.first = header->timestamp;
-                //         last_enemy_bullet.second = enemy_bullets;
-                //     }
-                // }
-                //
-                // // bullet collision packet
-                // else if (header->type == PacketType::BULLET_COLLISION) {
-                //     // WARN: we lose a UDP packet, player doesn't lose as
-                //     much player->health -= 0.2f;
-                // }
             }
         }
     }

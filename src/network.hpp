@@ -12,7 +12,7 @@
 
 #include "state/player.hpp"
 
-constexpr int PORT = 8080;
+constexpr uint32_t PORT = 8080;
 constexpr size_t ETHERNET_MTU = 1500;
 constexpr size_t MAX_PLAYERS = 5;
 // since packets take time to arrive

@@ -2,8 +2,32 @@
 
 ## Features
 
-- UDP multiplayer server using epoll
+- UDP Multiplayer server
 - 2D dungeon shooter game
+- State Sychronization
+- Latency/Interpolation Management
+
+## Building
+
+With CMake:
+
+```
+./build.sh
+```
+
+The client uses raylib. [Ensure libraries and drivers are installed.](https://github.com/raysan5/raylib/wiki)
+
+### Running the server (default is port 8080):
+
+```
+./build/hido
+```
+
+### Running the client:
+
+```
+./build/client <address> <port>
+```
 
 ## Resources
 

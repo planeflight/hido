@@ -150,13 +150,14 @@ void Client::render_bullets(uint64_t render_time) {
     auto &b = bullet_state_buffer[1];
     for (size_t i = 0; i < b.num_bullets; ++i) {
         auto &bullet_b = b.bullets[i];
-        // find in a
+        // find in previous frame (A)
         auto itr = std::find_if(b.bullets.begin(),
                                 b.bullets.end(),
                                 [&bullet_b](BulletPacket &bp) -> bool {
                                     return bullet_b.id == bp.id;
                                 });
         Color color = WHITE;
+        // enemy bullets
         if (client_id >= 0 && b.bullets[i].sender != client_id) {
             color = Color{50, 20, 235, 255};
         }
@@ -212,22 +213,16 @@ void Client::listen_thread() {
     }
 }
 
-void Client::send_client_packet(const Packet &packet) {
-    // send actual packet
+void Client::send_disconnect_packet() {
+    ClientPacket p{.header = {.timestamp = timestamp,
+                              .type = PacketType::CLIENT_DISCONNECT}};
+    Packet packet = create_packet_from<ClientPacket>(p);
     sendto(sock,
            packet.data(),
-           packet.size(),
+           sizeof(ClientPacket),
            0,
            (sockaddr *)&serv_addr,
            sizeof(serv_addr));
-}
-
-void Client::send_disconnect_packet() {
-    ClientPacket p{.header = {.timestamp = timestamp,
-                              .type = PacketType::CLIENT_DISCONNECT},
-                   .x = 0.0f,
-                   .y = 0.0f};
-    send_client_packet(create_packet_from<ClientPacket>(p));
 }
 
 void Client::send_input_packet() {
@@ -248,7 +243,7 @@ void Client::send_input_packet() {
     // send actual packet
     sendto(sock,
            packet.data(),
-           packet.size(),
+           sizeof(InputPacket),
            0,
            (sockaddr *)&serv_addr,
            sizeof(serv_addr));

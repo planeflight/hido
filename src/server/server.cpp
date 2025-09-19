@@ -130,6 +130,7 @@ void Server::process_events() {
                      MAX_PLAYERS);
         return;
     }
+    // add or return if client already exists
     ClientAddr &c = manager.add(client_addr);
     header->sender = c.id;
 
@@ -146,23 +147,6 @@ void Server::process_events() {
     else if (header->type == PacketType::CLIENT_DISCONNECT) {
         // TODO: client keeps sending disconnect until server acknowledges
         manager.remove(c);
-    }
-    // A BULLET COLLISION PACKET
-    else if (header->type == PacketType::BULLET_COLLISION) {
-        BulletCollisionPacket *bcp =
-            get_packet_data<BulletCollisionPacket>(packet);
-
-        // find receiver of the bullet collision's address
-        ClientAddr receiver_addr = manager.find_by_id(bcp->to);
-
-        // send message to the client in particular
-        sendto(sock,
-               packet.data(),
-               packet.size(),
-               0,
-               (sockaddr *)&receiver_addr.addr,
-               sizeof(receiver_addr.addr));
-        return;
     }
 }
 
@@ -253,7 +237,7 @@ void Server::send_game_state(uint64_t timestamp) {
         // send the packet
         sendto(sock,
                packet.data(),
-               packet.size(),
+               sizeof(GameStatePacket),
                0,
                (sockaddr *)&client.second.addr,
                sizeof(client.second.addr));
@@ -279,7 +263,8 @@ void Server::send_bullet_state(uint64_t timestamp) {
         // send the packet
         sendto(sock,
                packet.data(),
-               packet.size(),
+               sizeof(bsp.header) + sizeof(bsp.num_bullets) +
+                   sizeof(BulletPacket) * bsp.num_bullets,
                0,
                (sockaddr *)&client.second.addr,
                sizeof(client.second.addr));

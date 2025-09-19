@@ -22,7 +22,6 @@ constexpr uint32_t TICK_INTERVAL = 1000 / 60;
 enum class PacketType : uint8_t {
     CLIENT_DISCONNECT,
     BULLET,
-    BULLET_COLLISION,
     INPUT,
     GAME_STATE,
 };
@@ -42,7 +41,6 @@ using Packet = std::array<int8_t, ETHERNET_MTU>;
 // disconnect: client disconnects, server broadcasts message
 struct ClientPacket {
     PacketHeader header;
-    float x, y, health;
 };
 
 struct BulletCollisionPacket {

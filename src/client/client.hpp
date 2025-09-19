@@ -21,7 +21,6 @@ class Client {
     void render_bullets(uint64_t render_time);
 
     void listen_thread();
-    void send_client_packet(const Packet &packet);
     void send_disconnect_packet();
     void send_input_packet();
 

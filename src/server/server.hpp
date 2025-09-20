@@ -1,5 +1,5 @@
-#ifndef SERVER_HPP
-#define SERVER_HPP
+#ifndef HIDO_SERVER_SERVER_HPP
+#define HIDO_SERVER_SERVER_HPP
 
 #include <netinet/in.h>
 
@@ -39,4 +39,4 @@ class Server {
     int bullet_idx = 0;
 };
 
-#endif // SERVER_HPP
+#endif // HIDO_SERVER_SERVER_HPP

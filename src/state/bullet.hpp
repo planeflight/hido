@@ -1,5 +1,5 @@
-#ifndef STATE_BULLET_HPP
-#define STATE_BULLET_HPP
+#ifndef HIDO_STATE_BULLET_HPP
+#define HIDO_STATE_BULLET_HPP
 
 #include <raylib.h>
 
@@ -17,4 +17,4 @@ bool bullet_update(BulletState &b, float dt, GameMap &map);
 
 void bullet_render(const Vector2 &pos, Texture bullet_texture, Color color);
 
-#endif // STATE_BULLET_HPP
+#endif // HIDO_STATE_BULLET_HPP

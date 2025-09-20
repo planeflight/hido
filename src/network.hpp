@@ -1,5 +1,5 @@
-#ifndef NETWORK_HPP
-#define NETWORK_HPP
+#ifndef HIDO_NETWORK_HPP
+#define HIDO_NETWORK_HPP
 
 #include <netinet/in.h>
 #include <raylib.h>
@@ -105,4 +105,4 @@ inline uint64_t get_render_time() {
     return get_now_millis() - INTERPOLATION_DELAY;
 }
 
-#endif // NETWORK_HPP
+#endif // HIDO_NETWORK_HPP

@@ -151,14 +151,14 @@ void Server::process_events() {
 }
 
 void Server::update(float dt) {
-    // update clients
+    // update clients with last input
     for (auto &client : manager.get_clients()) {
         auto &player = client.second.player;
         auto &input = client.second.last_input;
         Vector2 vel{(input.right - input.left) * PLAYER_SPEED,
                     (input.down - input.up) * PLAYER_SPEED};
         player_update(player, vel, dt, *map);
-        // bullets
+        // create bullets when mouse down
         if (input.mouse_down) {
             Vector2 direction = Vector2Subtract(input.mouse_pos,
                                                 {player.rect.x, player.rect.y});
@@ -169,7 +169,8 @@ void Server::update(float dt) {
                 BulletState{t,
                             player.id,
                             bullet_idx++,
-                            Vector2{player.rect.x, player.rect.y},
+                            Vector2{player.rect.x + player.rect.width / 2.0f,
+                                    player.rect.y + player.rect.height / 2.0f},
                             vel});
         }
     }

@@ -5,6 +5,8 @@
 
 #include <algorithm>
 
+#include "state/player.hpp"
+
 ClientAddr::ClientAddr(sockaddr_in addr) : addr(addr) {}
 
 ClientManager::ClientManager() {}
@@ -12,7 +14,7 @@ ClientManager::ClientManager() {}
 ClientAddr &ClientManager::add(sockaddr_in client) {
     ClientAddr new_client(client);
     // set starting position
-    new_client.player.rect = {20.0f, 20.0f, 8.0f, 12.0f};
+    new_client.player.rect = {20.0f, 20.0f, PLAYER_WIDTH, PLAYER_HEIGHT};
     auto itr = std::find_if(
         clients.begin(), clients.end(), [&new_client](const auto &kv) {
             return kv.second == new_client;

@@ -1,5 +1,5 @@
-#ifndef MAP_MAP_HPP
-#define MAP_MAP_HPP
+#ifndef HIDO_MAP_MAP_HPP
+#define HIDO_MAP_MAP_HPP
 
 #include <libtmx-parser/tmxparser.h>
 #include <raylib.h>
@@ -85,4 +85,4 @@ class GameMap : public tmxparser::TmxMap {
     }
 };
 
-#endif // MAP_MAP_HPP
+#endif // HIDO_MAP_MAP_HPP

@@ -1,11 +1,12 @@
-#ifndef STATE_PLAYER_HPP
-#define STATE_PLAYER_HPP
+#ifndef HIDO_STATE_PLAYER_HPP
+#define HIDO_STATE_PLAYER_HPP
 
 #include <raylib.h>
 
 #include "map/map.hpp"
 
-constexpr float PLAYER_SPEED = 80.0f;
+constexpr float PLAYER_SPEED = 80.0f, PLAYER_WIDTH = 8.0f,
+                PLAYER_HEIGHT = 12.0f;
 
 struct PlayerState {
     Rectangle rect{0.0f, 0.0f, 0.0f, 0.0f};
@@ -22,4 +23,4 @@ void player_update(PlayerState &p, const Vector2 &vel, float dt, GameMap &map);
 
 PlayerState player_lerp(const PlayerState &a, const PlayerState &b, float t);
 
-#endif // STATE_PLAYER_HPP
+#endif // HIDO_STATE_PLAYER_HPP

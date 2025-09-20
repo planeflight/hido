@@ -1,5 +1,5 @@
-#ifndef STATEBUFFER_HPP
-#define STATEBUFFER_HPP
+#ifndef HIDO_STATEBUFFER_HPP
+#define HIDO_STATEBUFFER_HPP
 
 #include <cstdint>
 #include <deque>
@@ -34,4 +34,4 @@ class StateBuffer {
     std::deque<T> buffer;
 };
 
-#endif // STATEBUFFER_HPP
+#endif // HIDO_STATEBUFFER_HPP

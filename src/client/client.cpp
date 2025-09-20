@@ -96,6 +96,12 @@ void Client::run() {
         BeginMode2D(camera);
         map_renderer.render();
 
+        // render bullets
+        if (bullet_state_buffer.size() >= 2) {
+            uint64_t render_time = get_render_time();
+            render_bullets(render_time);
+        }
+
         // render other players
         if (game_state_buffer.size() >= 2) {
             uint64_t render_time = get_render_time();
@@ -104,11 +110,6 @@ void Client::run() {
         // render this player
         player_render(local_player, player_texture, health_bar_texture, WHITE);
 
-        // render bullets
-        if (bullet_state_buffer.size() >= 2) {
-            uint64_t render_time = get_render_time();
-            render_bullets(render_time);
-        }
         EndMode2D();
         EndDrawing();
     }
@@ -219,46 +220,44 @@ void Client::listen_thread() {
 
                     std::lock_guard<std::mutex> lock_guard(state_mutex);
                     game_state_buffer.push_back(*gsp);
-                    if (client_id != -1) {
-                        auto end = gsp->players.begin() + gsp->num_players;
-                        auto itr = std::find_if(
-                            gsp->players.begin(), end, [&](PlayerState &ps) {
-                                return ps.id == client_id;
-                            });
-                        // authoritative server overwrites true position
-                        if (itr != end) {
-                            local_player = *itr;
 
-                            // delete all inputs before last_acknowledged
-                            uint64_t last_acknowledged = gsp->header.timestamp;
-                            InputPacket target_last;
-                            target_last.header.timestamp = last_acknowledged;
-                            auto unacknowledged_range = std::upper_bound(
-                                unacknowledged.begin(),
-                                unacknowledged.end(),
-                                target_last,
-                                [](const InputPacket &a, const InputPacket &b) {
-                                    return a.header.timestamp <
-                                           b.header.timestamp;
-                                });
-                            unacknowledged.erase(unacknowledged.begin(),
-                                                 unacknowledged_range);
+                    // find player packet
+                    auto end = gsp->players.begin() + gsp->num_players;
+                    auto itr = std::find_if(
+                        gsp->players.begin(), end, [&](PlayerState &ps) {
+                            return ps.id == client_id;
+                        });
+                    // if there's no packet, just ignore this
+                    if (itr == end) continue;
 
-                            // reconstruct player position
-                            for (const InputPacket &input : unacknowledged) {
-                                Vector2 vel{
-                                    (input.right - input.left) * PLAYER_SPEED,
+                    // authoritative server overwrites true position
+                    local_player = *itr;
+
+                    // delete all inputs before last_acknowledged
+                    uint64_t last_acknowledged = gsp->header.timestamp;
+                    InputPacket target_last;
+                    target_last.header.timestamp = last_acknowledged;
+                    auto unacknowledged_range = std::upper_bound(
+                        unacknowledged.begin(),
+                        unacknowledged.end(),
+                        target_last,
+                        [](const InputPacket &a, const InputPacket &b) {
+                            return a.header.timestamp < b.header.timestamp;
+                        });
+                    unacknowledged.erase(unacknowledged.begin(),
+                                         unacknowledged_range);
+
+                    // reconstruct player position
+                    for (const InputPacket &input : unacknowledged) {
+                        Vector2 vel{(input.right - input.left) * PLAYER_SPEED,
                                     (input.down - input.up) * PLAYER_SPEED};
-                                player_update(
-                                    local_player, vel, input.dt, *map);
-                            }
-                        }
-                    } else if (header->type == PacketType::BULLET) {
-                        BulletStatePacket *bsp =
-                            get_packet_data<BulletStatePacket>(packet);
-                        std::lock_guard<std::mutex> lock_guard(state_mutex);
-                        bullet_state_buffer.push_back(*bsp);
+                        player_update(local_player, vel, input.dt, *map);
                     }
+                } else if (header->type == PacketType::BULLET) {
+                    BulletStatePacket *bsp =
+                        get_packet_data<BulletStatePacket>(packet);
+                    std::lock_guard<std::mutex> lock_guard(state_mutex);
+                    bullet_state_buffer.push_back(*bsp);
                 }
             }
         }

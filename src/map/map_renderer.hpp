@@ -1,5 +1,5 @@
-#ifndef MAP_MAPRENDERER_HPP
-#define MAP_MAPRENDERER_HPP
+#ifndef HIDO_MAP_MAPRENDERER_HPP
+#define HIDO_MAP_MAPRENDERER_HPP
 
 #include <raylib.h>
 
@@ -27,4 +27,4 @@ class MapRenderer {
     std::vector<Texture> tileset_textures;
 };
 
-#endif // MAP_MAPRENDERER_HPP
+#endif // HIDO_MAP_MAPRENDERER_HPP

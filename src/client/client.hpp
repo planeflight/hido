@@ -1,12 +1,11 @@
-#ifndef CLIENT_HPP
-#define CLIENT_HPP
+#ifndef HIDO_CLIENT_CLIENT_HPP
+#define HIDO_CLIENT_CLIENT_HPP
 
 #include <netinet/in.h>
 #include <raylib.h>
 
 #include <atomic>
 #include <mutex>
-#include <unordered_map>
 
 #include "map/map.hpp"
 #include "network.hpp"
@@ -49,4 +48,4 @@ class Client {
     std::unique_ptr<GameMap> map;
 };
 
-#endif // CLIENT_HPP
+#endif // HIDO_CLIENT_CLIENT_HPP

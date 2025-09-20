@@ -1,5 +1,5 @@
-#ifndef SERVER_CLIENTMANAGER_HPP
-#define SERVER_CLIENTMANAGER_HPP
+#ifndef HIDO_SERVER_CLIENTMANAGER_HPP
+#define HIDO_SERVER_CLIENTMANAGER_HPP
 
 #include <netinet/in.h>
 
@@ -53,4 +53,4 @@ class ClientManager {
     ClientID idx = 0;
 };
 
-#endif // SERVER_CLIENTMANAGER_HPP
+#endif // HIDO_SERVER_CLIENTMANAGER_HPP

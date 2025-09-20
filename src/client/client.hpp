@@ -6,8 +6,11 @@
 
 #include <atomic>
 #include <mutex>
+#include <unordered_map>
 
+#include "map/map.hpp"
 #include "network.hpp"
+#include "state/player.hpp"
 #include "state_buffer.hpp"
 
 class Client {
@@ -22,7 +25,8 @@ class Client {
 
     void listen_thread();
     void send_disconnect_packet();
-    void send_input_packet();
+    void send_input_packet(InputPacket &input);
+    InputPacket get_input();
 
     int sock = 0;
     sockaddr_in serv_addr{};
@@ -35,11 +39,14 @@ class Client {
     StateBuffer<BulletStatePacket> bullet_state_buffer;
 
     std::mutex state_mutex;
-    uint32_t timestamp = 0;
 
     // textures
     Texture player_texture, bullet_texture, health_bar_texture;
     Camera2D camera;
+
+    PlayerState local_player{};
+    std::vector<InputPacket> unacknowledged; // increasing order of timestamps
+    std::unique_ptr<GameMap> map;
 };
 
 #endif // CLIENT_HPP

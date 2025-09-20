@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <memory>
 #include <mutex>
 #include <thread>
 
@@ -59,14 +60,35 @@ void Client::run() {
     camera.rotation = 0.0f;
     camera.target = {0.0f, 0.0f};
 
-    GameMap map("./res/map/map1.tmx", "./res/map");
-    MapRenderer map_renderer(&map, "./res/map");
+    map = std::make_unique<GameMap>("./res/map/map1.tmx", "./res/map");
+    MapRenderer map_renderer(map.get(), "./res/map");
     while (!WindowShouldClose()) {
         // network updates
+        float dt = GetFrameTime();
+        // simulate locally
+        InputPacket input = get_input();
+        unacknowledged.push_back(input);
+        {
+            std::lock_guard<std::mutex> guard(state_mutex);
+            // if we already initialized position
+            if (client_id != -1) {
+                Vector2 vel{(input.right - input.left) * PLAYER_SPEED,
+                            (input.down - input.up) * PLAYER_SPEED};
+                player_update(local_player, vel, dt, *map);
+            }
+            // update camera for next frame
+            camera.target.x +=
+                (local_player.rect.x + local_player.rect.width / 2.0f -
+                 camera.target.x) *
+                0.05f;
+            camera.target.y +=
+                (local_player.rect.y + local_player.rect.height / 2.0f -
+                 camera.target.y) *
+                0.05f;
+        }
 
         // get input and send packet
-        send_input_packet();
-        timestamp++;
+        send_input_packet(input);
 
         // render
         BeginDrawing();
@@ -74,10 +96,15 @@ void Client::run() {
         BeginMode2D(camera);
         map_renderer.render();
 
+        // render other players
         if (game_state_buffer.size() >= 2) {
             uint64_t render_time = get_render_time();
             render_state(render_time);
         }
+        // render this player
+        player_render(local_player, player_texture, health_bar_texture, WHITE);
+
+        // render bullets
         if (bullet_state_buffer.size() >= 2) {
             uint64_t render_time = get_render_time();
             render_bullets(render_time);
@@ -123,21 +150,9 @@ void Client::render_state(uint64_t render_time) {
         }
         // draw others in red
         Color color = {207, 87, 80, 255};
-        // if this players data
-        if (player_b.id == b.client_id) {
-            client_id = b.client_id; // save it for any other cases
-            // update camera for next frame
-            camera.target.x +=
-                (resolved_player_state.rect.x +
-                 resolved_player_state.rect.width / 2.0f - camera.target.x) *
-                0.05f;
-            camera.target.y +=
-                (resolved_player_state.rect.y +
-                 resolved_player_state.rect.height / 2.0f - camera.target.y) *
-                0.05f;
-            // update color
-            color = WHITE;
-        }
+        // if this players data skip because we're drawing it in realtime
+        if (player_b.id == b.client_id) continue;
+
         player_render(
             resolved_player_state, player_texture, health_bar_texture, color);
     }
@@ -200,13 +215,50 @@ void Client::listen_thread() {
                 if (header->type == PacketType::GAME_STATE) {
                     GameStatePacket *gsp =
                         get_packet_data<GameStatePacket>(packet);
+                    client_id = gsp->client_id;
+
                     std::lock_guard<std::mutex> lock_guard(state_mutex);
                     game_state_buffer.push_back(*gsp);
-                } else if (header->type == PacketType::BULLET) {
-                    BulletStatePacket *bsp =
-                        get_packet_data<BulletStatePacket>(packet);
-                    std::lock_guard<std::mutex> lock_guard(state_mutex);
-                    bullet_state_buffer.push_back(*bsp);
+                    if (client_id != -1) {
+                        auto end = gsp->players.begin() + gsp->num_players;
+                        auto itr = std::find_if(
+                            gsp->players.begin(), end, [&](PlayerState &ps) {
+                                return ps.id == client_id;
+                            });
+                        // authoritative server overwrites true position
+                        if (itr != end) {
+                            local_player = *itr;
+
+                            // delete all inputs before last_acknowledged
+                            uint64_t last_acknowledged = gsp->header.timestamp;
+                            InputPacket target_last;
+                            target_last.header.timestamp = last_acknowledged;
+                            auto unacknowledged_range = std::upper_bound(
+                                unacknowledged.begin(),
+                                unacknowledged.end(),
+                                target_last,
+                                [](const InputPacket &a, const InputPacket &b) {
+                                    return a.header.timestamp <
+                                           b.header.timestamp;
+                                });
+                            unacknowledged.erase(unacknowledged.begin(),
+                                                 unacknowledged_range);
+
+                            // reconstruct player position
+                            for (const InputPacket &input : unacknowledged) {
+                                Vector2 vel{
+                                    (input.right - input.left) * PLAYER_SPEED,
+                                    (input.down - input.up) * PLAYER_SPEED};
+                                player_update(
+                                    local_player, vel, input.dt, *map);
+                            }
+                        }
+                    } else if (header->type == PacketType::BULLET) {
+                        BulletStatePacket *bsp =
+                            get_packet_data<BulletStatePacket>(packet);
+                        std::lock_guard<std::mutex> lock_guard(state_mutex);
+                        bullet_state_buffer.push_back(*bsp);
+                    }
                 }
             }
         }
@@ -214,8 +266,7 @@ void Client::listen_thread() {
 }
 
 void Client::send_disconnect_packet() {
-    ClientPacket p{.header = {.timestamp = timestamp,
-                              .type = PacketType::CLIENT_DISCONNECT}};
+    ClientPacket p{.header = {.type = PacketType::CLIENT_DISCONNECT}};
     Packet packet = create_packet_from<ClientPacket>(p);
     sendto(sock,
            packet.data(),
@@ -225,7 +276,19 @@ void Client::send_disconnect_packet() {
            sizeof(serv_addr));
 }
 
-void Client::send_input_packet() {
+void Client::send_input_packet(InputPacket &input) {
+    Packet packet = create_packet_from<InputPacket>(input);
+
+    // send actual packet
+    sendto(sock,
+           packet.data(),
+           sizeof(InputPacket),
+           0,
+           (sockaddr *)&serv_addr,
+           sizeof(serv_addr));
+}
+
+InputPacket Client::get_input() {
     InputPacket input;
     input.left = IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT);
     input.right = IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT);
@@ -237,14 +300,6 @@ void Client::send_input_packet() {
 
     input.header.type = PacketType::INPUT;
     input.header.timestamp = get_now_millis();
-
-    Packet packet = create_packet_from<InputPacket>(input);
-
-    // send actual packet
-    sendto(sock,
-           packet.data(),
-           sizeof(InputPacket),
-           0,
-           (sockaddr *)&serv_addr,
-           sizeof(serv_addr));
+    input.dt = GetFrameTime();
+    return input;
 }

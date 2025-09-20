@@ -37,8 +37,10 @@ constexpr size_t MAX_PACKET_SIZE = ETHERNET_MTU - sizeof(PacketHeader);
 using Packet = std::array<int8_t, ETHERNET_MTU>;
 
 // PROTOCOLS
-// update: position/status update
 // disconnect: client disconnects, server broadcasts message
+// Game State: player states
+// BulletState: all the bullets
+
 struct ClientPacket {
     PacketHeader header;
 };
@@ -52,6 +54,7 @@ struct InputPacket {
     PacketHeader header;
     bool left, right, up, down, mouse_down;
     Vector2 mouse_pos;
+    float dt;
 };
 
 struct GameStatePacket {

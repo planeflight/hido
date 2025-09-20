@@ -8,7 +8,7 @@
 constexpr float PLAYER_SPEED = 80.0f;
 
 struct PlayerState {
-    Rectangle rect;
+    Rectangle rect{0.0f, 0.0f, 0.0f, 0.0f};
     float health = 1.0f;
     int8_t id = -1;
 };

@@ -8,7 +8,6 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <vector>
 
 #include "state/player.hpp"
 
@@ -43,11 +42,6 @@ using Packet = std::array<int8_t, ETHERNET_MTU>;
 
 struct ClientPacket {
     PacketHeader header;
-};
-
-struct BulletCollisionPacket {
-    PacketHeader header;
-    int8_t to;
 };
 
 struct InputPacket {

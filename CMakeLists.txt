@@ -21,7 +21,6 @@ set(SRC
     src/state/player.cpp
     src/state/bullet.cpp
     src/network.cpp
-    src/util.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SRC})
@@ -33,7 +32,6 @@ add_executable(client
     src/state/player.cpp
     src/state/bullet.cpp
     src/network.cpp
-    src/util.cpp
 )
 
 include_directories(src/)

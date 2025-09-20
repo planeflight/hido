@@ -130,23 +130,51 @@ void Server::process_events() {
                      MAX_PLAYERS);
         return;
     }
-    // add or return if client already exists
-    ClientAddr &c = manager.add(client_addr);
-    header->sender = c.id;
+
+    // CONNECT PACKET
+    if (header->type == PacketType::CLIENT_CONNECT) {
+        // add or return if client already exists
+        ClientAddr *c = manager.add(client_addr);
+        // returns the id
+        header->sender = c->id;
+        // resend the packet back to "acknowledge" it
+        sendto(sock,
+               packet.data(),
+               sizeof(ClientPacket),
+               0,
+               (sockaddr *)&c->addr,
+               sizeof(c->addr));
+        return;
+    }
+    ClientAddr *c = manager.get(client_addr);
+    // client already deleted
+    if (c == nullptr) {
+        return;
+    }
+    // TODO: remove this, client should know its id
+    // return the id
+    header->sender = c->id;
 
     if (header->type == PacketType::INPUT) {
         // update last input packet for the corresponding client
         InputPacket *input_packet = get_packet_data<InputPacket>(packet);
-        if (input_packet->header.timestamp > c.last_input.header.timestamp) {
-            c.last_input = *input_packet;
-            c.player.id = c.id;
+        if (input_packet->header.timestamp > c->last_input.header.timestamp) {
+            c->last_input = *input_packet;
+            c->player.id = c->id;
         }
+        return;
     }
 
     // DISCONNECT PACKET
-    else if (header->type == PacketType::CLIENT_DISCONNECT) {
-        // TODO: client keeps sending disconnect until server acknowledges
-        manager.remove(c);
+    if (header->type == PacketType::CLIENT_DISCONNECT) {
+        manager.remove(*c);
+        // resend the packet back to "acknowledge" it
+        sendto(sock,
+               packet.data(),
+               sizeof(ClientPacket),
+               0,
+               (sockaddr *)&c->addr,
+               sizeof(c->addr));
     }
 }
 

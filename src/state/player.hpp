@@ -9,7 +9,8 @@ constexpr float PLAYER_SPEED = 80.0f, PLAYER_WIDTH = 8.0f,
                 PLAYER_HEIGHT = 12.0f;
 
 struct PlayerState {
-    Rectangle rect{0.0f, 0.0f, 0.0f, 0.0f};
+    PlayerState();
+    Rectangle rect{20.0f, 20.0f, PLAYER_WIDTH, PLAYER_HEIGHT};
     float health = 1.0f;
     int8_t id = -1;
 };

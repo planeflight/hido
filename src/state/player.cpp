@@ -2,6 +2,10 @@
 
 #include <raylib.h>
 
+PlayerState::PlayerState() {
+    rect = Rectangle{20.0f, 20.0f, PLAYER_WIDTH, PLAYER_HEIGHT};
+}
+
 void player_render(const PlayerState &p,
                    Texture player_texture,
                    Texture health_texture,

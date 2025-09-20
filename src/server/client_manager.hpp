@@ -4,7 +4,6 @@
 #include <netinet/in.h>
 
 #include <cstring>
-#include <set>
 #include <unordered_map>
 
 #include "network.hpp"
@@ -38,7 +37,8 @@ struct ClientAddr {
 class ClientManager {
   public:
     ClientManager();
-    ClientAddr &add(sockaddr_in client);
+    ClientAddr *add(sockaddr_in client);
+    ClientAddr *get(sockaddr_in client);
     void remove(const ClientAddr &c);
     size_t count() const;
 

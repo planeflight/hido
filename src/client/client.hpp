@@ -23,13 +23,14 @@ class Client {
     void render_bullets(uint64_t render_time);
 
     void listen_thread();
+    void send_connect_packet();
     void send_disconnect_packet();
     void send_input_packet(InputPacket &input);
     InputPacket get_input();
 
     int sock = 0;
     sockaddr_in serv_addr{};
-    std::atomic<bool> running = true;
+    std::atomic<bool> running = true, connecting = true;
 
     constexpr static int WIDTH = 1080, HEIGHT = 720;
 
@@ -43,7 +44,7 @@ class Client {
     Texture player_texture, bullet_texture, health_bar_texture;
     Camera2D camera;
 
-    PlayerState local_player{};
+    PlayerState local_player;
     std::vector<InputPacket> unacknowledged; // increasing order of timestamps
     std::unique_ptr<GameMap> map;
 };

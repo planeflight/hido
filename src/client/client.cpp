@@ -20,7 +20,7 @@
 #include "state/bullet.hpp"
 #include "state/player.hpp"
 
-Client::Client(const std::string &addr, uint32_t port) {
+Client::Client(const std::string &addr, uint32_t port) : local_player() {
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
@@ -44,9 +44,17 @@ Client::~Client() {
 }
 
 void Client::run() {
+    using namespace std::chrono_literals;
     if (!running) return;
     spdlog::info("Running client.");
     std::thread listening{[&]() { listen_thread(); }};
+
+    // send connecting messages
+    while (connecting) {
+        send_connect_packet();
+        std::this_thread::sleep_for(50ms);
+    }
+    spdlog::info("ID: {}", client_id);
 
     SetTargetFPS(60);
     InitWindow(WIDTH, HEIGHT, "HIDO");
@@ -114,9 +122,12 @@ void Client::run() {
         EndDrawing();
     }
     // broadcast disconnect
-    send_disconnect_packet();
+    // keep sending disconnect packet until server gets it
+    while (running) {
+        send_disconnect_packet();
+        std::this_thread::sleep_for(50ms);
+    }
 
-    running = false;
     if (listening.joinable()) listening.join();
 
     spdlog::info("Client shutting down.");
@@ -204,6 +215,7 @@ void Client::listen_thread() {
             while (running) {
                 sockaddr_in from{};
                 socklen_t len = sizeof(from);
+                // expect max size
                 if (recvfrom(sock,
                              packet.data(),
                              packet.size(),
@@ -216,7 +228,7 @@ void Client::listen_thread() {
                 if (header->type == PacketType::GAME_STATE) {
                     GameStatePacket *gsp =
                         get_packet_data<GameStatePacket>(packet);
-                    client_id = gsp->client_id;
+                    // client_id = gsp->client_id;
 
                     std::lock_guard<std::mutex> lock_guard(state_mutex);
                     game_state_buffer.push_back(*gsp);
@@ -259,16 +271,36 @@ void Client::listen_thread() {
                     std::lock_guard<std::mutex> lock_guard(state_mutex);
                     bullet_state_buffer.push_back(*bsp);
                 }
+                // this means the server acknowledged it
+                else if (header->type == PacketType::CLIENT_DISCONNECT) {
+                    running = false;
+                    break;
+                }
+                // this means the server acknowledged it
+                else if (header->type == PacketType::CLIENT_CONNECT) {
+                    connecting = false;
+                    // IMPORTANT: save ID, now client knows who it is
+                    client_id = header->sender;
+                }
             }
         }
     }
 }
 
+void Client::send_connect_packet() {
+    ClientPacket p{.header = {.type = PacketType::CLIENT_CONNECT}};
+    sendto(sock,
+           &p,
+           sizeof(ClientPacket),
+           0,
+           (sockaddr *)&serv_addr,
+           sizeof(serv_addr));
+}
+
 void Client::send_disconnect_packet() {
     ClientPacket p{.header = {.type = PacketType::CLIENT_DISCONNECT}};
-    Packet packet = create_packet_from<ClientPacket>(p);
     sendto(sock,
-           packet.data(),
+           &p,
            sizeof(ClientPacket),
            0,
            (sockaddr *)&serv_addr,
@@ -276,11 +308,9 @@ void Client::send_disconnect_packet() {
 }
 
 void Client::send_input_packet(InputPacket &input) {
-    Packet packet = create_packet_from<InputPacket>(input);
-
     // send actual packet
     sendto(sock,
-           packet.data(),
+           &input,
            sizeof(InputPacket),
            0,
            (sockaddr *)&serv_addr,
@@ -299,6 +329,7 @@ InputPacket Client::get_input() {
 
     input.header.type = PacketType::INPUT;
     input.header.timestamp = get_now_millis();
+    input.header.sender = client_id;
     input.dt = GetFrameTime();
     return input;
 }

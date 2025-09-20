@@ -19,6 +19,7 @@ constexpr uint64_t INTERPOLATION_DELAY = 100;
 constexpr uint32_t TICK_INTERVAL = 1000 / 60;
 
 enum class PacketType : uint8_t {
+    CLIENT_CONNECT,
     CLIENT_DISCONNECT,
     BULLET,
     INPUT,
@@ -46,9 +47,10 @@ struct ClientPacket {
 
 struct InputPacket {
     PacketHeader header;
-    bool left, right, up, down, mouse_down;
-    Vector2 mouse_pos;
-    float dt;
+    bool left = false, right = false, up = false, down = false,
+         mouse_down = false;
+    Vector2 mouse_pos{0.0f, 0.0f};
+    float dt = 0.0f;
 };
 
 struct GameStatePacket {
@@ -60,7 +62,7 @@ struct GameStatePacket {
 
 struct BulletPacket {
     int sender = -1, id = -1;
-    Vector2 pos;
+    Vector2 pos = {0.0f, 0.0f};
 };
 constexpr size_t MAX_BULLETS_PER_PACKET =
     MAX_PACKET_SIZE / sizeof(BulletPacket);

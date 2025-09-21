@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <string>
 
 #include "map/map.hpp"
 #include "network.hpp"
@@ -14,7 +15,7 @@
 
 class Client {
   public:
-    Client(const std::string &addr, uint32_t port);
+    Client(const std::string &addr, uint32_t port, const std::string &name);
     ~Client();
     void run();
 
@@ -25,12 +26,13 @@ class Client {
     void listen_thread();
     void send_connect_packet();
     void send_disconnect_packet();
-    void send_input_packet(InputPacket &input);
+    void send_input_packet(const InputPacket &input);
     InputPacket get_input();
 
     int sock = 0;
     sockaddr_in serv_addr{};
     std::atomic<bool> running = true, connecting = true;
+    std::string name;
 
     constexpr static int WIDTH = 1080, HEIGHT = 720;
 

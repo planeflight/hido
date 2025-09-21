@@ -44,6 +44,7 @@ using Packet = std::array<int8_t, ETHERNET_MTU>;
 
 struct ClientPacket {
     PacketHeader header;
+    char name[MAX_NAME_LENGTH + 1];
 };
 
 struct InputPacket {

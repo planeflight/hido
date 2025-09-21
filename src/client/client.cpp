@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -20,7 +21,8 @@
 #include "state/bullet.hpp"
 #include "state/player.hpp"
 
-Client::Client(const std::string &addr, uint32_t port) : local_player() {
+Client::Client(const std::string &addr, uint32_t port, const std::string &name)
+    : name(name) {
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(port);
@@ -289,6 +291,7 @@ void Client::listen_thread() {
 
 void Client::send_connect_packet() {
     ClientPacket p{.header = {.type = PacketType::CLIENT_CONNECT}};
+    strcpy(p.name, name.c_str());
     sendto(sock,
            &p,
            sizeof(ClientPacket),
@@ -307,7 +310,7 @@ void Client::send_disconnect_packet() {
            sizeof(serv_addr));
 }
 
-void Client::send_input_packet(InputPacket &input) {
+void Client::send_input_packet(const InputPacket &input) {
     // send actual packet
     sendto(sock,
            &input,

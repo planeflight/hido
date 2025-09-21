@@ -4,10 +4,11 @@
 #include <string>
 
 #include "client.hpp"
+#include "network.hpp"
 
 int main(int argc, char **argv) {
-    if (argc != 3) {
-        spdlog::error("Invalid usage: ./client <address> <port>");
+    if (argc != 4) {
+        spdlog::error("Invalid usage: ./client <address> <port> <name>");
         return -1;
     }
     int port = 8080;
@@ -20,7 +21,13 @@ int main(int argc, char **argv) {
         spdlog::error("std::out_of_range: {}", e.what());
         return -1;
     }
-    Client client(argv[1], port);
+    std::string name = argv[3];
+    if (name.length() > MAX_NAME_LENGTH) {
+        spdlog::error("Invalid name: Must be <= {} characters.",
+                      MAX_NAME_LENGTH);
+        return -1;
+    }
+    Client client(argv[1], port, name);
     client.run();
     return 0;
 }

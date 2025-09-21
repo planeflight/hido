@@ -93,8 +93,9 @@ void Server::serve() {
         while (accumulate >= dt) {
             accumulate -= dt;
             update(dt);
+            // track last update only
+            last_t = std::chrono::steady_clock::now();
         }
-        last_t = std::chrono::steady_clock::now();
         uint64_t timestamp = get_now_millis();
         send_game_state(timestamp);
         send_bullet_state(timestamp);
@@ -133,7 +134,8 @@ void Server::process_events() {
     // CONNECT PACKET
     if (header->type == PacketType::CLIENT_CONNECT) {
         // add or return if client already exists
-        ClientAddr *c = manager.add(client_addr);
+        ClientAddr *c = manager.add(
+            client_addr, get_packet_data<ClientPacket>(packet)->name);
         // returns the id
         header->sender = c->id;
         // resend the packet back to "acknowledge" it

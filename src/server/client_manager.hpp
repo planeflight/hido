@@ -12,6 +12,7 @@
 using ClientID = int;
 struct ClientAddr {
     explicit ClientAddr(sockaddr_in addr);
+    ClientAddr(sockaddr_in addr, const char name[MAX_NAME_LENGTH + 1]);
     ClientAddr() = default;
 
     bool operator<(const ClientAddr &other) const {
@@ -37,7 +38,7 @@ struct ClientAddr {
 class ClientManager {
   public:
     ClientManager();
-    ClientAddr *add(sockaddr_in client);
+    ClientAddr *add(sockaddr_in client, const char name[MAX_NAME_LENGTH + 1]);
     ClientAddr *get(sockaddr_in client);
     void remove(const ClientAddr &c);
     size_t count() const;

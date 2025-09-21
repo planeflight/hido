@@ -33,6 +33,14 @@ void player_render(const PlayerState &p,
                   Color{150, 80, 250, 255});
     // finally draw the texture
     DrawTexture(health_texture, health_rect.x, health_rect.y, WHITE);
+
+    // draw the name
+    float width = MeasureText(p.name, 3);
+    DrawText(p.name,
+             p.rect.x + p.rect.width / 2.0f - width / 2.0f,
+             p.rect.y + p.rect.height + 1.0f,
+             3,
+             WHITE);
 }
 
 void player_update(PlayerState &p, const Vector2 &vel, float dt, GameMap &map) {

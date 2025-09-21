@@ -4,15 +4,22 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cstring>
 
 #include "state/player.hpp"
 
 ClientAddr::ClientAddr(sockaddr_in addr) : addr(addr), player() {}
 
+ClientAddr::ClientAddr(sockaddr_in addr, const char name[MAX_NAME_LENGTH + 1])
+    : addr(addr) {
+    strcpy(player.name, name);
+}
+
 ClientManager::ClientManager() {}
 
-ClientAddr *ClientManager::add(sockaddr_in client) {
-    ClientAddr new_client(client);
+ClientAddr *ClientManager::add(sockaddr_in client,
+                               const char name[MAX_NAME_LENGTH + 1]) {
+    ClientAddr new_client(client, name);
     // set starting position
     new_client.player.rect = {20.0f, 20.0f, PLAYER_WIDTH, PLAYER_HEIGHT};
     auto itr = std::find_if(
@@ -22,7 +29,7 @@ ClientAddr *ClientManager::add(sockaddr_in client) {
     // add client if not already contained
     if (itr == clients.end()) {
         new_client.id = idx++;
-        spdlog::info("Client {} connected.", new_client.id);
+        spdlog::info("Client id: {}, name: {} connected.", new_client.id, name);
         auto [itr, _] = clients.emplace(new_client.id, std::move(new_client));
         return &itr->second;
     }

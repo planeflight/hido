@@ -1,5 +1,7 @@
 # Hido
 
+Multiplayer UDP dungeon shooter game!
+
 ## Features
 
 - _Authoritive UDP Game Server_

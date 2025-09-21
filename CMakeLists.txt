@@ -13,6 +13,9 @@ SET (CMAKE_CXX_FLAGS "-Wall -Wextra -Wcast-qual -Wconversion-null -Wformat-secur
 
 set(CMAKE_CXX_STANDARD 20)
 
+# enforce static linking
+set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+
 set(SRC
     src/server/server.cpp
     src/server/client_manager.cpp
@@ -47,6 +50,8 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/fmtlib/fmt.git
     GIT_TAG 11.2.0
 )
+set(FMT_INSTALL OFF)
+set(FMT_TEST OFF)
 FetchContent_MakeAvailable(fmt)
 
 FetchContent_Declare(
@@ -54,8 +59,11 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/gabime/spdlog.git
     GIT_TAG v1.15.3
 )
+set(SPDLOG_INSTALL OFF)
+set(SPDLOG_BUILD_SHARED OFF)
 FetchContent_MakeAvailable(spdlog)
 
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
 add_subdirectory(lib/raylib)
 add_subdirectory(lib/libtmx-parser)
 

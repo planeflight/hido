@@ -56,7 +56,7 @@ void Client::run() {
     }
     spdlog::info("ID: {}", client_id);
 
-    SetTargetFPS(60);
+    SetTargetFPS(FPS);
     InitWindow(WIDTH, HEIGHT, "HIDO");
 
     player_texture = LoadTexture("./res/player/idle.png");

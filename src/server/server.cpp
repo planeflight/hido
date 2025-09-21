@@ -69,8 +69,6 @@ void Server::serve() {
 
     auto last_t = std::chrono::steady_clock::now();
 
-    const auto tick_interval = std::chrono::milliseconds(TICK_INTERVAL);
-
     map = std::make_unique<GameMap>("./res/map/map1.tmx", "./res/map");
 
     while (running) {
@@ -87,18 +85,19 @@ void Server::serve() {
 
         // update the game
         auto now = std::chrono::steady_clock::now();
-        if (now - last_t >= tick_interval) {
-            double dt = std::chrono::duration<double>(now - last_t).count();
-            last_t = now;
+        double accumulate =
+            std::chrono::duration_cast<std::chrono::duration<double>>(now -
+                                                                      last_t)
+                .count();
+        const float dt = TICK_INTERVAL / 1000.0f;
+        while (accumulate >= dt) {
+            accumulate -= dt;
             update(dt);
-
-            uint64_t timestamp =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    now.time_since_epoch())
-                    .count();
-            send_game_state(timestamp);
-            send_bullet_state(timestamp);
         }
+        last_t = std::chrono::steady_clock::now();
+        uint64_t timestamp = get_now_millis();
+        send_game_state(timestamp);
+        send_bullet_state(timestamp);
     }
 }
 

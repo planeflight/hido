@@ -16,7 +16,8 @@ constexpr size_t ETHERNET_MTU = 1500;
 constexpr size_t MAX_PLAYERS = 5;
 // since packets take time to arrive
 constexpr uint64_t INTERPOLATION_DELAY = 100;
-constexpr uint32_t TICK_INTERVAL = 1000 / 60;
+constexpr uint32_t FPS = 60;
+constexpr uint32_t TICK_INTERVAL = 1000 / FPS;
 
 enum class PacketType : uint8_t {
     CLIENT_CONNECT,

@@ -2,6 +2,8 @@
 
 Multiplayer UDP dungeon shooter game!
 
+![Screenshot](res/screenshots/screenshot.png)
+
 ## Features
 
 - _Authoritive UDP Game Server_

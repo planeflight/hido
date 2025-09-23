@@ -4,7 +4,7 @@ project(libtmx-parser)
 
 set (CMAKE_CXX_FLAGS "-std=c++20")
 
-add_library(${PROJECT_NAME} SHARED 
+add_library(${PROJECT_NAME} STATIC
     tmxparser.cpp
     base64.cpp
     tinyxml2/tinyxml2.cpp
